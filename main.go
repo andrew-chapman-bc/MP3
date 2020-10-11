@@ -1,13 +1,13 @@
 package main
+
 import (
 	"./unicast"
 	"bufio"
 	"fmt"
-	"os"
-	"sync"
-	"strings"
 	"github.com/akamensky/argparse"
+	"os"
 	"strconv"
+	"sync"
 )
 
 /*
@@ -17,13 +17,15 @@ import (
 	@params: N/A
 	@returns: []string
 */
-func getInput() []string {
+func getInput() float64 {
 	fmt.Println("Enter input >> ")
 	reader := bufio.NewReader(os.Stdin)
 	input, _ := reader.ReadString('\n')
-	inputArray := strings.Fields(input)
-	return inputArray
-
+	s, err := strconv.ParseFloat(input, 64)
+	if err != nil {
+		return s
+	}
+	return 0
 }
 
 /*
@@ -33,9 +35,10 @@ func getInput() []string {
 	@params: N/A
 	@returns: {UserInput}, {Connection}
 */
+
 func parseInput(source *string) (unicast.UserInput, unicast.Connection) {
-	inputArray := getInput()
-	inputStruct := unicast.CreateUserInputStruct(inputArray[1], inputArray[2], *source)
+	input := getInput()
+	inputStruct := unicast.CreateUserInputStruct(input, *source)
 	connection := unicast.ScanConfigForClient(inputStruct)
 	return inputStruct, connection
 }

@@ -1,0 +1,21 @@
+{
+  "connections": [
+    {
+      "Type": "server",
+      "Port": "1234"
+    },
+    {
+      "Type": "client",
+      "Port": "4567"
+    },
+    {
+      "Type": "client",
+      "Port": "8543"
+    },
+    {
+      "Type": "client",
+      "Port": "1432"
+    }
+  ],
+  "IP": "127.0.0.1"
+}

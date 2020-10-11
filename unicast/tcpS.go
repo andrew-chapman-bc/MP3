@@ -61,10 +61,10 @@ func ScanConfigForServer(source string) (string, error) {
 	@params: string, string, string
 	@returns: {UserInput}
 */
-func CreateUserInputStruct(destination, message, source string) UserInput {
+func CreateUserInputStruct(state float64, source string) UserInput {
 	var input UserInput
-	input.Destination = destination
-	input.Message = message
+	input.Round = 0
+	input.State = state
 	input.Source = source
 	return input
 }

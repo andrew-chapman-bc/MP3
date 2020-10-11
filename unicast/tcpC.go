@@ -10,11 +10,11 @@ import (
 	"time"
 )
 
-// UserInput holds user input such as message, destination and source
+// UserInput holds state, source, and round number of client
 type UserInput struct {
-	Destination string
-	Message     string
-	Source 		string
+	State     float64
+	Source 	  string
+	Round     int
 }
 
 // Delay keeps track of delay bounds from config
@@ -22,11 +22,26 @@ type Delay struct {
 	minDelay string
 	maxDelay string
 }
-// Connection holds the ip/port and source
+
+/*
+	Type: "Server"/"Client" whether it's server or client
+	Port: "1234", etc. Port attached to username
+	Username: name of connection
+	IP: IP address to connect to
+*/
 type Connection struct {
-	ip 		string
-	port 	string
-	source 	string
+	Type string `json:"Type"`
+	Port string `json:"Port"`
+	Username string `json:"Username"`
+}
+
+/*
+	Connections: []Connection
+	IP: IP Address to connect to
+*/
+type Connections struct {
+	Connections []Connection `json:"connections"`
+	IP string `json:"IP"`
 }
 
 /*
@@ -36,6 +51,7 @@ type Connection struct {
 	@params: {userInput} 
 	@returns: {Connection}
 */
+/*
 func ScanConfigForClient(userInput UserInput) Connection {
 
 	destination := userInput.Destination
@@ -74,7 +90,8 @@ func ScanConfigForClient(userInput UserInput) Connection {
 		counter++
 	}
 	return connection
-} 
+}
+*/
 
 /*
 	@function: connectToTCPServer
@@ -106,11 +123,11 @@ func connectToTCPServer(connect string) (net.Conn, error) {
 func SendMessage( messageParams UserInput, connection Connection ) {
 	connectionString := connection.ip + ":" + connection.port
 	c, err := connectToTCPServer(connectionString)
-	if (err != nil) {
+	if err != nil {
 		fmt.Println("Network Error: ", err)
 	}
 	
-	if (err != nil) {
+	if err != nil {
 		fmt.Println("Error: ", err)
 	}
 	

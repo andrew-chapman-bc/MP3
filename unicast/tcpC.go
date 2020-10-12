@@ -30,9 +30,7 @@ type Delay struct {
 	IP: IP address to connect to
 */
 type Connection struct {
-	Type string `json:"Type"`
 	Port string `json:"Port"`
-	Username string `json:"Username"`
 }
 
 /*

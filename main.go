@@ -10,6 +10,9 @@ import (
 	"sync"
 )
 
+// go run main.go 1234
+//.5
+
 /*
 	@function: getInput
 	@description: gets the input entered through I/O and packages it into an array that will be used to create a {UserInput}
@@ -51,13 +54,13 @@ func parseInput(source *string) (unicast.UserInput, unicast.Connection) {
 	@params: {WaitGroup}
 	@returns: N/A
 */
-func openTCPServerConnections(source *string) {
+func openTCPServerConnections(source *string, valueChan chan float64) error {
 	// Need to send the source string in here so we know what port to look for
-	openPort, err := unicast.ScanConfigForServer(*source)
-	if openPort == "" {
-		fmt.Println(err)
+	// openPort, err := unicast.ScanConfigForServer(*source)
+	if source == "" {
+		return errors.New("Source string is incorrect")
 	}
-	unicast.ConnectToTCPClient(openPort)
+	unicast.ConnectToTCPClient(source, valueChan)
 }
 
 /*
@@ -83,12 +86,10 @@ func main() {
 	}
 	s := strconv.Itoa(*i)
 
-	// Use a wait group for goroutines
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go openTCPServerConnections(&s)
+	valueChannel := make(chan float64)
+	go openTCPServerConnections(&s, valueChannel)
 	inputStruct, connection := parseInput(&s)
-	wg.Add(1)
+
 	go unicastSend(inputStruct, connection, &wg)
-	wg.Wait()
+
 }

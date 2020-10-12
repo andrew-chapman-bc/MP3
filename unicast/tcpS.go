@@ -11,6 +11,8 @@ import (
 	"errors"
 	"math/rand"
 	"strconv"
+	"encoding/gob"
+	"ioutil"
 )
 
 /*
@@ -20,37 +22,25 @@ import (
 	@params: N/A
 	@returns: []string
 */
-func ScanConfigForServer(source string) (string, error) {
-	config, err := os.Open("config.txt")
+func scanConfigForFaultyNodes() ([]int, error) {
+	config, err := os.Open("config.json")
 	if err != nil {
 		fmt.Println(err)
 	}
-
-	scanner := bufio.NewScanner(config)
-	scanner.Split(bufio.ScanLines)
-	counter := 0
-	for {
-		success := scanner.Scan()
-		if success == false {
-			err = scanner.Err()
-			if err == nil {
-				break
-			} else {
-				log.Fatal(err)
-				break
-			}
+	// [n, f]
+	nodeArray := []int
+	connections := new(Connections)
+	byteValue, err := ioutil.ReadAll(config)
+	json.Unmarshal(byteValue, &connections)
+	faultyCounter := 0
+	nodeCounter := len(connections.Connections)
+	for i := 0; i < len(connections.Connections); i++ {
+		if connections.Connections[i].Status == "faulty" {
+			faultyCounter += 1
 		}
-		// don't check the first line
-		if (counter != 0) {
-			configArray := strings.Fields(scanner.Text())
-			port := configArray[2]
-			if (configArray[0] == source) {
-				return port, nil
-			}
-		}
-		counter++
 	}
-	return "", errors.New("Cannot find port")
+	nodeArray.append(nodeArray, nodeCounter, faultyCounter)
+	return nodeArray, errors.New("Cannot find port")
 }
 
 
@@ -77,24 +67,56 @@ func CreateUserInputStruct(state float64, source string) UserInput {
 	@params: net.Conn
 	@returns: N/A
 */
-func handleConnection(c net.Conn) {
+func handleConnection(c net.Conn) error {
+	nodeArray, err := scanConfigForFaultyNodes()
+	if (err != nil) {
+		fmt.Println(err)
+		return errors.New("There was an error scanning node array")
+	}
 	// even though we don't support multi-messaging at the moment, no reason to possibly be running this multiple times inside the for loop
 	delay, err := getDelayParams()
 	if (err != nil) {
 		fmt.Println("Error: ", err)
+		return errors.New("Error getting delay params")
 	}
-	
+	inputArray := []UserInput{}
+	// [userInput: {State1, round1, 1234}, userInput: {State2, round1, 4567}]
+	decoder := gob.NewDecoder(c)
 	for {
-		netData, err := bufio.NewReader(c).ReadString('\n')
+		// state round source
         if err != nil {
             fmt.Println(err)
             return
 		}
-		netArray := strings.Fields(netData)
 		// generate the network delay on the receive side, must do it here and not in the sendmessage function because we are using goroutines
 		generateDelay(delay)
-		timeOfReceive := time.Now().Format("02 Jan 06 15:04:05.000 MST")
-		fmt.Println("Received " + netArray[0] + " from destination " + netArray[1] + " system time is: " + timeOfReceive)
+
+		// [ [State, round, source], [State, round, source] ]
+		input := new(UserInput)
+		decoder.Decode(&input)
+		roundCounter := 1
+		counter := 0
+		inputArray = append(inputArray, input)
+		// function to check if within .0001
+		
+		nodesWaitedFor := nodeArray[0] - nodeArray[1]
+		for index, val := range inputArray {
+			if (val.Round == roundCounter) {
+				counter += 1
+			}
+			if (counter == nodesWaitedFor) {
+				newValue, err := getAvgValues(inputArray, roundCounter)
+				// roundCounter++
+				break
+			}
+		}
+		
+	}
+}
+
+func getAvgValues(inputArr []UserInput, roundCounter int) (float64, error) {
+	for index, val := range inputArr {
+		
 	}
 }
 
@@ -149,7 +171,7 @@ func generateDelay (delay Delay) {
 	@params: string
 	@returns: N/A
 */
-func ConnectToTCPClient(PORT string) {
+func ConnectToTCPClient(PORT string, valueChan chan float64) {
 	// listen/connect to the tcp client
 	l, err := net.Listen("tcp4", ":" + PORT)
 	if err != nil {
@@ -161,6 +183,6 @@ func ConnectToTCPClient(PORT string) {
 		if err != nil {
 			fmt.Println(err)
 		}
-		go handleConnection(c)
+		go handleConnection(c, valueChan)
 	}
 }

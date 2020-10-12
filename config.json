@@ -1,20 +1,20 @@
 {
   "connections": [
     {
-      "Type": "server",
-      "Port": "1234"
+      "Port": "1234",
+      "Status": ""
     },
     {
-      "Type": "client",
-      "Port": "4567"
+      "Port": "4567",
+      "Status": ""
     },
     {
-      "Type": "client",
-      "Port": "8543"
+      "Port": "8543",
+      "Status": ""
     },
     {
-      "Type": "client",
-      "Port": "1432"
+      "Port": "1432",
+      "Status": ""
     }
   ],
   "IP": "127.0.0.1"

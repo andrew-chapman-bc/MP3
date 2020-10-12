@@ -1,153 +1,175 @@
 package unicast
 
 import (
-	"encoding/gob"
 	"fmt"
+	"errors"
 	"net"
+	"os"
+	"io/ioutil"
+	"encoding/json"
+	"../util"
+	"strings"
+	"sync"
 )
 
-// UserInput holds state, source, and round number of client
-type UserInput struct {
-	State     float64
-	Source 	  string
-	Round     int
-}
 
-// Delay keeps track of delay bounds from config
-type Delay struct {
-	minDelay string
-	maxDelay string
+// Client holds the structure of our TCP Client implementation
+type Client struct {
+	Username string
+	client net.Conn
 }
 
 /*
-	Type: "Server"/"Client" whether it's server or client
-	Port: "1234", etc. Port attached to username
-	Username: name of connection
-	IP: IP address to connect to
-*/
-type Connection struct {
-	Port string `json:"Port"`
-	State string `json:"State"`
-	Status string `json:"Status"`
-}
-
-/*
-	Connections: []Connection
-	IP: IP Address to connect to
-*/
-type Connections struct {
-	Connections []Connection `json:"connections"`
-	IP string `json:"IP"`
-}
-
-/*
-	@function: ScanConfigForClient
-	@description: Scans the config file using the user input destination and retrieves the ip/port that will later be used to connect to the TCP server
+	@function: NewTCPClient
+	@description: Creates a Client instance which can be used in the main function
 	@exported: True
-	@params: {userInput} 
-	@returns: {Connection}
+	@family: N/A
+	@params: string
+	@returns: {*Client}, error
 */
-/*
-func ScanConfigForClient(userInput UserInput) Connection {
-
-	destination := userInput.Destination
-	
-	// Open up config file
-	// TODO: create a variable which holds the destination of config file instead of hardcoding here
-	config, err := os.Open("config.txt")
-	if err != nil {
-		log.Fatal(err)
+func NewTCPClient(username string) (*Client, error) {
+	client := Client{Username: username}
+	// if username is empty -> throw error
+	if username == "" {
+		fmt.Println("error here 1")
+		return nil, errors.New("Error: Address not found")
 	}
 
-	scanner := bufio.NewScanner(config)
-	scanner.Split(bufio.ScanLines)
-	var connection Connection
-	counter := 0
+	return &client, nil
+}
+
+
+func (cli *Client) sendUserToServer() (err error){
+	fmt.Fprintf(cli.client, cli.Username + "\n")
+	return
+}
+
+/*
+	@function: RunCli
+	@description: Starts the TCP client which calls the function to send message to server
+	@exported: True
+	@family: Client
+	@params: chan {Message}
+	@returns: error
+*/
+func (cli *Client) RunCli(messageChan chan util.Message, ) (err error) {
+	
+	connection, err := cli.readJSONForClient(cli.Username)
+	if err != nil {
+		return err
+	}
+	fmt.Println(connection.Port)
+	cli.client, err = net.Dial("tcp", connection.Port)
+	if err != nil {
+		return err
+	}
+
 	for {
-		success := scanner.Scan()
-		if success == false {
-			err = scanner.Err()
-			if err == nil {
-				break
-			} else {
-				log.Fatal(err)
-				break
-			}
+		messageData := <- messageChan
+		if messageData.Message == "EXIT" {
+			wg.Done()
+			break
+		} else if messageData.Receiver == "Client Not Connected" {
+			fmt.Println("Client not connected")
 		}
-		if counter != 0 {
-			// TODO: should do some more error handling here to make sure they are accurate ports/ips in the config
-			configArray := strings.Fields(scanner.Text())
-			if configArray[0] == destination {
-				connection.ip = configArray[1]
-				connection.port = configArray[2]
-				connection.source = userInput.Source
-			}
-		}
-		counter++
+		fmt.Println(messageData)
+		go cli.sendMessageToServer(cli.client, messageData)
 	}
-	return connection
+	wg.Done()
+	fmt.Println("outside the for loop here now")
+	wg.Wait()
+	return
+
 }
-*/
 
 /*
-	@function: connectToTCPServer
-	@description:	Connects to the TCP server with the ip/port obtained from config file as a parameter and 
-					returns the connection to the server which will later be used to write to the server
+	@function: sendMessageToServer
+	@description: Reads the message channel and serializes the data to send over to server
 	@exported: false
-	@params: string 
-	@returns: net.Conn, err
+	@family: Client
+	@params: net.Conn, chan {Message}
+	@returns: error
 */
-func connectToTCPServer(connect string) (net.Conn, error) {
-	// Dial in to the TCP Server, return the connection to it
-	c, err := net.Dial("tcp", connect)
+func (cli *Client) sendMessageToServer(conn net.Conn, messageData util.Message) (err error) {
+	
+
+	jsonData, err := json.Marshal(messageData)
 	if err != nil {
-		fmt.Println(err)
-		return nil, nil
+		return err
 	}
 
-	return c, err
-} 
+	encoder := json.NewEncoder(conn)
+	encoder.Encode(jsonData)
+	fmt.Println("data sent!", messageData)
+	return
+}
 
 /*
-	@function: SendMessage
-	@description: 	SendMessage sends the message from TCPClient to TCPServer by connecting to the server and 
-					using the Fprintf function to send the message.
-	@exported: True
-	@params: {UserInput}, {Connection}
-	@returns: N/A
+	@function: listenForMessage
+	@description: Listens for a message from the server and deserializes it 
+	@exported: false
+	@family: Client
+	@params: net.Conn, chan {Message}
+	@returns: error
 */
-func SendMessage( messageParams UserInput, connection Connections ) {
-	var destination string
-	roundCounter := 1
-	for i := 0; i < len(connection.Connections); i++ {
-		if connection.Connections[i].Port == messageParams.Source {
-			continue
+func (cli *Client) listenForMessage(conn net.Conn, messageChan chan util.Message) (err error) {
+	for {
+		decoder := json.NewDecoder(conn)
+		var mess util.Message
+		decoder.Decode(&mess)
+
+		if mess.Message == "error" {
+			messageChan <- util.Message{"Client Not Connected", "", ""}
+			return errors.New("Person not connected yet")
+		} else if mess.Message == "EXIT" {
+			conn.Close()
+			os.Exit(0)
+			messageChan <- util.Message{"","EXIT",""}
+		} else if mess.Message != "" {
+			fmt.Printf("Received the message from" + strings.TrimSpace(mess.Sender) + "\n") 
+			fmt.Printf("Message:" + strings.TrimSpace(mess.Message))
 		}
-		destination = connection.Connections[i].Port
-		connectionString := connection.IP + ":" + destination
-		c, err := connectToTCPServer(connectionString)
-		if err != nil {
-			fmt.Println("Network Error: ", err)
+	}
+}
+
+
+
+/*
+	@function: readJSONForClient
+	@description: Reads the JSON File and adds to it if needed, then returns the specific connection that is needed
+	@exported: false
+	@family: Client
+	@params: string
+	@returns: {Connection}, error
+*/
+func (cli *Client) readJSONForClient(userName string) (util.Connection, error) {
+	jsonFile, err := os.Open("connections.json")
+	var connections util.Connections
+	ourConnect := util.Connection{"","",""}
+	if err != nil {
+		return ourConnect, errors.New("Error opening JSON file on Client Side")
+	}
+	byteValue, _ := ioutil.ReadAll(jsonFile)
+	json.Unmarshal(byteValue, &connections)
+	for i := 0; i < len(connections.Connections); i++ {
+		if connections.Connections[i].Username == userName {
+			connections.Connections[i].Port = connections.IP + ":" + connections.Connections[i].Port
+			return connections.Connections[i], nil
 		}
-
-		if err != nil {
-			fmt.Println("Error: ", err)
-		}
-
-
-		messageParams.Round = roundCounter
-
-		encoder := gob.NewEncoder(c)
-		encoder.Encode(messageParams)
 	}
 
-
-
-	// Sending the message to TCP Server
-	// Easier to send this over as strings since it is only one message, we want the source to know where it comes from
-	//fmt.Fprintf(c, messageParams.Message + " " + messageParams.Source + "\n")
-	//timeOfSend := time.Now().Format("02 Jan 06 15:04:05.000 MST")
-	//fmt.Println("Sent message " + messageParams.Message + " to destination " + messageParams.Destination + " system time is: " + timeOfSend)
+	ourConnect.Port = connections.IP + ":" + connections.Connections[0].Port
+	ourConnect.Type = "client"
+	ourConnect.Username = userName
 	
-} 
+	connections.Connections = append(connections.Connections, ourConnect)
+	
+	jsonData, err := json.Marshal(connections)
+	if err != nil {
+		fmt.Println("Error marshalling JSON")
+	}
+
+	ioutil.WriteFile("connections.json", jsonData, os.ModePerm)
+	return ourConnect, nil
+}
 

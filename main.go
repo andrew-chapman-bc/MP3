@@ -2,13 +2,10 @@ package main
 
 import (
 	"./unicast"
-	"bufio"
 	"fmt"
 	"github.com/akamensky/argparse"
 	"os"
-	"strings"
-	"sync"
-	"errors"
+	"./utils"
 )
 
 
@@ -30,7 +27,7 @@ func getCmdLine() string {
 
 func main() {
 
-	messageChannel := make(chan message)
+	messageChannel := make(chan utils.Message)
 	s := getCmdLine()
 	
 	
@@ -39,9 +36,7 @@ func main() {
 		fmt.Println("Error reading json", err)
 	}
 	
-	
-	var serv *unicast.Server
-	port := cmdLineArr[1]
+	port := s
 	serv, err := unicast.NewTCPServer(port, connections)
 	if err != nil {
 		fmt.Println(err)
@@ -49,22 +44,31 @@ func main() {
 	
 	
 	go func() {
-		err := unicast.serv.RunServ(messageChannel)
-	}
+		err := serv.RunServ(messageChannel)
+		if err != nil {
+			fmt.Println(err)
+		}
+	}()
 
 	portArr := utils.GetConnectionsPorts(connections)
 	var cliArr [3]*unicast.Client
-	for index, _ := range cliArr {
+	for index := range cliArr {
 		cli, err := unicast.NewTCPClient(portArr[index], connections)
+		if err != nil {
+			fmt.Println(err)
+		}
 		cliArr[index] = cli
 	}
 
 	go func() {
 		newMessage := <- messageChannel
-		for index, client := range cliArr {
-			unicast.client.sendMessageToServer(newMessage)
+		for _, client := range cliArr {
+			err := client.SendMessageToServer(newMessage)
+			if err != nil {
+				fmt.Println(err)
+			}
 		}
-	}
+	}()
 	// 
 
 

@@ -50,7 +50,7 @@ func NewTCPServer(port string, connections utils.Connections) (*Server, error) {
 	@returns: error
 */
 func (serv *Server) RunServ(messageChannel chan utils.Message) (err error) {
-	
+	fmt.Println("connected to", serv.port)
 	serv.server, err = net.Listen("tcp", ":" + serv.port)
     if err != nil {
         return err
@@ -107,10 +107,8 @@ func (serv *Server) handleConnections(conn net.Listener, messageChannel chan uti
 /*
 [
 	[
-		{State Round},
-		{State, Round},
-		{State Round},
-		{State Round}
+		{ownState 1Round},
+		
 	],
 	[
 		{State Round},

@@ -4,11 +4,8 @@ import (
 	"fmt"
 	"errors"
 	"net"
-	"os"
-	"io/ioutil"
 	"encoding/json"
 	"../utils"
-	"strings"
 )
 
 
@@ -66,7 +63,7 @@ func (cli *Client) RunCli() (err error) {
 	@params: net.Conn, chan {Message}
 	@returns: error
 */
-func (cli *Client) sendMessageToServer(messageData utils.Message) (err error) {
+func (cli *Client) SendMessageToServer(messageData utils.Message) (err error) {
 	
 
 	jsonData, err := json.Marshal(messageData)
@@ -79,44 +76,3 @@ func (cli *Client) sendMessageToServer(messageData utils.Message) (err error) {
 	fmt.Println("data sent!", messageData)
 	return
 }
-
-
-/*
-	@function: readJSONForClient
-	@description: Reads the JSON File and adds to it if needed, then returns the specific connection that is needed
-	@exported: false
-	@family: Client
-	@params: string
-	@returns: {Connection}, error
-*/
-func (cli *Client) readJSONForClient(userName string) (util.Connection, error) {
-	jsonFile, err := os.Open("connections.json")
-	var connections util.Connections
-	ourConnect := util.Connection{"","",""}
-	if err != nil {
-		return ourConnect, errors.New("Error opening JSON file on Client Side")
-	}
-	byteValue, _ := ioutil.ReadAll(jsonFile)
-	json.Unmarshal(byteValue, &connections)
-	for i := 0; i < len(connections.Connections); i++ {
-		if connections.Connections[i].Username == userName {
-			connections.Connections[i].Port = connections.IP + ":" + connections.Connections[i].Port
-			return connections.Connections[i], nil
-		}
-	}
-
-	ourConnect.Port = connections.IP + ":" + connections.Connections[0].Port
-	ourConnect.Type = "client"
-	ourConnect.Username = userName
-	
-	connections.Connections = append(connections.Connections, ourConnect)
-	
-	jsonData, err := json.Marshal(connections)
-	if err != nil {
-		fmt.Println("Error marshalling JSON")
-	}
-
-	ioutil.WriteFile("connections.json", jsonData, os.ModePerm)
-	return ourConnect, nil
-}
-

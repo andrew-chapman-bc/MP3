@@ -3,8 +3,11 @@ package main
 import (
 	"./unicast"
 	"bufio"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/akamensky/argparse"
+	"io/ioutil"
 	"os"
 	"strconv"
 	"sync"
@@ -20,6 +23,7 @@ import (
 	@params: N/A
 	@returns: []string
 */
+/*
 func getInput() float64 {
 	fmt.Println("Enter input >> ")
 	reader := bufio.NewReader(os.Stdin)
@@ -30,7 +34,7 @@ func getInput() float64 {
 	}
 	return 0
 }
-
+*/
 /*
 	@function: parseInput
 	@description: Parses the UserInput into a {UserInput} and calls ScanConfig() to parse the parameters of TCP connection into a {Connection}
@@ -39,12 +43,14 @@ func getInput() float64 {
 	@returns: {UserInput}, {Connection}
 */
 
+/*
 func parseInput(source *string) (unicast.UserInput, unicast.Connection) {
 	input := getInput()
 	inputStruct := unicast.CreateUserInputStruct(input, *source)
 	connection := unicast.ScanConfigForClient(inputStruct)
 	return inputStruct, connection
 }
+*/
 
 /*
 	@function: openTCPServerConnections
@@ -54,13 +60,35 @@ func parseInput(source *string) (unicast.UserInput, unicast.Connection) {
 	@params: {WaitGroup}
 	@returns: N/A
 */
-func openTCPServerConnections(source *string, valueChan chan float64) error {
+func openTCPServerConnections(source *string, valueChan chan unicast.UserInput) error {
 	// Need to send the source string in here so we know what port to look for
 	// openPort, err := unicast.ScanConfigForServer(*source)
-	if source == "" {
+	if *source == "" {
 		return errors.New("Source string is incorrect")
 	}
-	unicast.ConnectToTCPClient(source, valueChan)
+	unicast.ConnectToTCPClient(*source, valueChan)
+}
+
+func parseJson(source *string) (unicast.UserInput, unicast.Connections) {
+	config, err := os.Open("config.json")
+	if err != nil {
+		fmt.Println(err)
+	}
+	var connections unicast.Connections
+	byteValue, err := ioutil.ReadAll(config)
+	json.Unmarshal(byteValue, connections)
+	var initialNode unicast.UserInput
+	for i := 0; i < len(connections.Connections); i++ {
+		if connections.Connections[i].Port == *source {
+			s, err := strconv.ParseFloat(connections.Connections[i].State, 64)
+			if err != nil {
+				fmt.Println("Error in initial Node")
+			}
+			initialNode.State = s
+		}
+	}
+	initialNode.Source = *source
+	return initialNode, connections
 }
 
 /*
@@ -70,8 +98,8 @@ func openTCPServerConnections(source *string, valueChan chan float64) error {
 	@params: {UserInput}, {Connection}, {WaitGroup}
 	@returns: N/A
 */
-func unicastSend(inputStruct unicast.UserInput, connection unicast.Connection, wg *sync.WaitGroup) {
-	defer wg.Done()
+func unicastSend(inputStruct unicast.UserInput, connection unicast.Connections, wg *sync.WaitGroup) {
+	//defer wg.Done()
 	// Send the message using UserInput struct and Connection struct to easily pass around data
 	unicast.SendMessage(inputStruct, connection)
 }
@@ -86,10 +114,14 @@ func main() {
 	}
 	s := strconv.Itoa(*i)
 
-	valueChannel := make(chan float64)
+	valueChannel := make(chan unicast.UserInput)
 	go openTCPServerConnections(&s, valueChannel)
-	inputStruct, connection := parseInput(&s)
+
+	inputStruct, connection := parseJson(&s)
 
 	go unicastSend(inputStruct, connection, &wg)
+
+	var message unicast.UserInput
+	message <- valueChannel
 
 }

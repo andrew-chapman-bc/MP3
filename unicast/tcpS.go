@@ -1,18 +1,20 @@
 package unicast
 
 import (
-	"fmt"
-	"net"
+	"MachineProblem1/unicast"
 	"bufio"
+	"encoding/gob"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io/ioutil"
+	"log"
+	"math/rand"
+	"net"
+	"os"
+	"strconv"
 	"strings"
 	"time"
-	"os"
-	"log"
-	"errors"
-	"math/rand"
-	"strconv"
-	"encoding/gob"
-	"ioutil"
 )
 
 /*
@@ -39,7 +41,7 @@ func scanConfigForFaultyNodes() ([]int, error) {
 			faultyCounter += 1
 		}
 	}
-	nodeArray.append(nodeArray, nodeCounter, faultyCounter)
+	nodeArray = append(nodeArray, nodeCounter, faultyCounter)
 	return nodeArray, errors.New("Cannot find port")
 }
 
@@ -67,7 +69,7 @@ func CreateUserInputStruct(state float64, source string) UserInput {
 	@params: net.Conn
 	@returns: N/A
 */
-func handleConnection(c net.Conn) error {
+func handleConnection(c net.Conn, valueChan chan UserInput) error {
 	nodeArray, err := scanConfigForFaultyNodes()
 	if (err != nil) {
 		fmt.Println(err)
@@ -82,42 +84,59 @@ func handleConnection(c net.Conn) error {
 	inputArray := []UserInput{}
 	// [userInput: {State1, round1, 1234}, userInput: {State2, round1, 4567}]
 	decoder := gob.NewDecoder(c)
+	roundCounter := 1
 	for {
 		// state round source
         if err != nil {
             fmt.Println(err)
-            return
+            return err
 		}
 		// generate the network delay on the receive side, must do it here and not in the sendmessage function because we are using goroutines
 		generateDelay(delay)
 
 		// [ [State, round, source], [State, round, source] ]
-		input := new(UserInput)
-		decoder.Decode(&input)
-		roundCounter := 1
+		var input UserInput
+		_ = decoder.Decode(&input)
 		counter := 0
 		inputArray = append(inputArray, input)
 		// function to check if within .0001
 		
 		nodesWaitedFor := nodeArray[0] - nodeArray[1]
-		for index, val := range inputArray {
-			if (val.Round == roundCounter) {
+		for _, val := range inputArray {
+			if val.Round == roundCounter {
 				counter += 1
 			}
-			if (counter == nodesWaitedFor) {
+			if counter == nodesWaitedFor {
 				newValue, err := getAvgValues(inputArray, roundCounter)
-				// roundCounter++
+				if err != nil {
+					fmt.Println(err)
+					return err
+				}
+				var send UserInput
+				send.State = newValue
+				send.Round = roundCounter
+				valueChan <- send
+
 				break
 			}
 		}
+		roundCounter++
 		
 	}
 }
 
 func getAvgValues(inputArr []UserInput, roundCounter int) (float64, error) {
-	for index, val := range inputArr {
-		
+	counter := 0.00
+	total := 0.00
+	for _, val := range inputArr {
+		if val.Round == roundCounter {
+			total += val.State
+			counter++
+		}
+
 	}
+	averageVal := total/counter
+	return averageVal, nil
 }
 
 
@@ -171,7 +190,7 @@ func generateDelay (delay Delay) {
 	@params: string
 	@returns: N/A
 */
-func ConnectToTCPClient(PORT string, valueChan chan float64) {
+func ConnectToTCPClient(PORT string, valueChan chan UserInput) {
 	// listen/connect to the tcp client
 	l, err := net.Listen("tcp4", ":" + PORT)
 	if err != nil {

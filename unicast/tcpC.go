@@ -1,13 +1,9 @@
 package unicast
 
 import (
-	"bufio"
+	"encoding/gob"
 	"fmt"
-	"log"
 	"net"
-	"os"
-	"strings"
-	"time"
 )
 
 // UserInput holds state, source, and round number of client
@@ -31,6 +27,8 @@ type Delay struct {
 */
 type Connection struct {
 	Port string `json:"Port"`
+	State string `json:"State"`
+	Status string `json:"Status"`
 }
 
 /*
@@ -118,22 +116,38 @@ func connectToTCPServer(connect string) (net.Conn, error) {
 	@params: {UserInput}, {Connection}
 	@returns: N/A
 */
-func SendMessage( messageParams UserInput, connection Connection ) {
-	connectionString := connection.ip + ":" + connection.port
-	c, err := connectToTCPServer(connectionString)
-	if err != nil {
-		fmt.Println("Network Error: ", err)
+func SendMessage( messageParams UserInput, connection Connections ) {
+	var destination string
+	roundCounter := 1
+	for i := 0; i < len(connection.Connections); i++ {
+		if connection.Connections[i].Port == messageParams.Source {
+			continue
+		}
+		destination = connection.Connections[i].Port
+		connectionString := connection.IP + ":" + destination
+		c, err := connectToTCPServer(connectionString)
+		if err != nil {
+			fmt.Println("Network Error: ", err)
+		}
+
+		if err != nil {
+			fmt.Println("Error: ", err)
+		}
+
+
+		messageParams.Round = roundCounter
+
+		encoder := gob.NewEncoder(c)
+		encoder.Encode(messageParams)
 	}
-	
-	if err != nil {
-		fmt.Println("Error: ", err)
-	}
-	
+
+
+
 	// Sending the message to TCP Server
 	// Easier to send this over as strings since it is only one message, we want the source to know where it comes from
-	fmt.Fprintf(c, messageParams.Message + " " + messageParams.Source + "\n")
-	timeOfSend := time.Now().Format("02 Jan 06 15:04:05.000 MST")
-	fmt.Println("Sent message " + messageParams.Message + " to destination " + messageParams.Destination + " system time is: " + timeOfSend)
+	//fmt.Fprintf(c, messageParams.Message + " " + messageParams.Source + "\n")
+	//timeOfSend := time.Now().Format("02 Jan 06 15:04:05.000 MST")
+	//fmt.Println("Sent message " + messageParams.Message + " to destination " + messageParams.Destination + " system time is: " + timeOfSend)
 	
 } 
 

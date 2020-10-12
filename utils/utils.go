@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io/ioutil"
+	"strconv"
 )
 /*
 	Connections: []Connection
@@ -35,9 +36,10 @@ type Message struct {
 
 type Messages struct {
 	Messages []Message
+}
+type MessagesArr struct {
 	MessagesArr []Messages
 }
-
 type NodeNums struct {
 	totalNodes int
 	faultyNodes int
@@ -88,9 +90,31 @@ func createNodesObj(total, faulty int) NodeNums {
 	var nodes NodeNums
 	nodes.totalNodes = total
 	nodes.faultyNodes = faulty
+	return nodes
 }
 
-func calculateAverage(messages Messages, index int ) (Message, error) {
+func CalculateAverage(messagesArr MessagesArr, index int ) (Message, error) {
 	total := 0
-	
+	divisor := 0
+	var newMess Message
+	var round int
+	for i := 0; i < len(messagesArr.MessagesArr); i++ {
+		if (i == index) {
+			for j := 0; j < len(messagesArr.MessagesArr[i].Messages); j++ {
+				state := messagesArr.MessagesArr[i].Messages[j].State
+				round = messagesArr.MessagesArr[i].Messages[j].Round
+				stateInt, err := strconv.Atoi(state)
+				if err != nil {
+					return newMess, err
+				}
+				total += stateInt
+				divisor++
+			}
+		}
+	}
+	newState := total/divisor
+	newStateString := strconv.Itoa(newState)
+	newRound := round + 1
+	newMess = CreateMessage(newStateString, newRound)
+	return newMess, nil
 }

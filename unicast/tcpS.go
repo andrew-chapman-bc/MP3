@@ -76,12 +76,13 @@ func (serv *Server) RunServ() (err error) {
 */
 func (serv *Server) handleConnections() (err error) {
 	var messages utils.Messages
+	var messagesArr utils.MessagesArr
 	ownState, err := fetchInitialState()
 	if err != nil {
 		return err
 	}
 	messages.Messages[0] := ownState
-	messages.MessagesArr[0] := messages.Messages
+	messagesArr.MessagesArr[0] := messages.Messages
 	for {
 		conn, err := serv.server.Accept()
 		
@@ -90,7 +91,7 @@ func (serv *Server) handleConnections() (err error) {
             break
 		}
 
-        go serv.handleConnection(conn, messages)
+        go serv.handleConnection(conn, messagesArr)
 	}
 	
     return
@@ -104,7 +105,7 @@ func (serv *Server) handleConnections() (err error) {
 	@params: net.Conn, map[string]net.Conn
 	@returns: error
 */
-[
+/*[
 	[
 		{State Round},
 		{State, Round},
@@ -118,7 +119,8 @@ func (serv *Server) handleConnections() (err error) {
 		{State Round}
 	] 
 ]
-func (serv *Server) handleConnection(conn net.Conn, messages utils.Messages) (err error) {
+*/
+func (serv *Server) handleConnection(conn net.Conn, messages utils.MessagesArr) (err error) {
 	fmt.Println("ok ok")
 	nodes, err := utils.GetNodeNums()
 	if err != nil {
@@ -134,10 +136,11 @@ func (serv *Server) handleConnection(conn net.Conn, messages utils.Messages) (er
 			return err
 		}
 		
-		messages.MessagesArr[mess.Round-1].append(messages.MessagesArr[mess.Round-1], mess)
-		for i, val := range messages.MessagesArr {
+		messagesArr.MessagesArr[mess.Round-1].append(messagesArr.MessagesArr[mess.Round-1], mess)
+		for i, val := range messagesArr.MessagesArr {
 			if len(val) >= (nodes.totalNodes - nodes.faultyNodes) {
-				// send this specific val {Message} through channel after it is calculated
+				newMess := utils.CalculateAverage(messagesArr, i)
+				// send this newMess over a channel to be sent 
 			}
 		}
 

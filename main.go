@@ -43,12 +43,10 @@ func main() {
 	}
 	
 	
-	go func() {
-		err := serv.RunServ(messageChannel)
-		if err != nil {
-			fmt.Println(err)
-		}
-	}()
+	err1 := serv.RunServ(messageChannel)
+	if err1 != nil {
+		fmt.Println(err)
+	}
 
 	portArr := utils.GetConnectionsPorts(connections)
 	var cliArr [3]*unicast.Client

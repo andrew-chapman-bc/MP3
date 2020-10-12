@@ -51,8 +51,9 @@ func NewTCPServer(port string, connections utils.Connections) (*Server, error) {
 */
 func (serv *Server) RunServ(messageChannel chan utils.Message) (err error) {
 	fmt.Println("connected to", serv.port)
-	serv.server, err = net.Listen("tcp", ":" + serv.port)
+	serv.server, err = net.Listen("tcp", serv.Connections.IP + ":" + serv.port)
     if err != nil {
+		fmt.Println("we did not connect")
         return err
 	}
 	fmt.Println("Listening to the port:", serv.port)
@@ -162,7 +163,7 @@ func (serv *Server) handleConnection(conn net.Conn, messagesArr utils.MessagesAr
 	@returns: Connections
 */
 func (serv *Server) fetchInitialState() (utils.Message, error) {
-	jsonFile, err := os.Open("connections.json")
+	jsonFile, err := os.Open("config.json")
 	var connections utils.Connections
 	var selfState utils.Message
 	if err != nil {

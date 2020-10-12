@@ -2,10 +2,10 @@ package main
 
 import (
 	"./unicast"
+	"./utils"
 	"fmt"
 	"github.com/akamensky/argparse"
 	"os"
-	"./utils"
 )
 
 

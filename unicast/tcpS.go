@@ -1,9 +1,8 @@
 package unicast
 
 import (
-	"MachineProblem1/unicast"
-	"bufio"
 	"encoding/gob"
+	"bufio"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -30,7 +29,7 @@ func scanConfigForFaultyNodes() ([]int, error) {
 		fmt.Println(err)
 	}
 	// [n, f]
-	nodeArray := []int
+	nodeArray := []int{}
 	connections := new(Connections)
 	byteValue, err := ioutil.ReadAll(config)
 	json.Unmarshal(byteValue, &connections)
@@ -38,7 +37,7 @@ func scanConfigForFaultyNodes() ([]int, error) {
 	nodeCounter := len(connections.Connections)
 	for i := 0; i < len(connections.Connections); i++ {
 		if connections.Connections[i].Status == "faulty" {
-			faultyCounter += 1
+			faultyCounter++
 		}
 	}
 	nodeArray = append(nodeArray, nodeCounter, faultyCounter)
@@ -70,6 +69,7 @@ func CreateUserInputStruct(state float64, source string) UserInput {
 	@returns: N/A
 */
 func handleConnection(c net.Conn, valueChan chan UserInput) error {
+	fmt.Println("up here")
 	nodeArray, err := scanConfigForFaultyNodes()
 	if (err != nil) {
 		fmt.Println(err)
@@ -83,7 +83,9 @@ func handleConnection(c net.Conn, valueChan chan UserInput) error {
 	}
 	inputArray := []UserInput{}
 	// [userInput: {State1, round1, 1234}, userInput: {State2, round1, 4567}]
+	fmt.Println("here")
 	decoder := gob.NewDecoder(c)
+	fmt.Println("didn't make it here")
 	roundCounter := 1
 	for {
 		// state round source
@@ -98,6 +100,7 @@ func handleConnection(c net.Conn, valueChan chan UserInput) error {
 		var input UserInput
 		_ = decoder.Decode(&input)
 		counter := 0
+		fmt.Println(inputArray)
 		inputArray = append(inputArray, input)
 		// function to check if within .0001
 		
@@ -112,10 +115,12 @@ func handleConnection(c net.Conn, valueChan chan UserInput) error {
 					fmt.Println(err)
 					return err
 				}
+
+				
 				var send UserInput
 				send.State = newValue
 				send.Round = roundCounter
-				valueChan <- send
+				sendMessageFromServer(send)
 
 				break
 			}
@@ -123,6 +128,17 @@ func handleConnection(c net.Conn, valueChan chan UserInput) error {
 		roundCounter++
 		
 	}
+}
+
+func sendMessageFromServer(input UserInput) {
+	config, err := os.Open("config.json")
+	if err != nil {
+		fmt.Println(err)
+	}
+	var connections Connections
+	byteValue, err := ioutil.ReadAll(config)
+	json.Unmarshal(byteValue, &connections)
+	SendMessage(input, connections)
 }
 
 func getAvgValues(inputArr []UserInput, roundCounter int) (float64, error) {
@@ -192,13 +208,18 @@ func generateDelay (delay Delay) {
 */
 func ConnectToTCPClient(PORT string, valueChan chan UserInput) {
 	// listen/connect to the tcp client
+	fmt.Println("shit")
 	l, err := net.Listen("tcp4", ":" + PORT)
+	fmt.Println(PORT)
+	fmt.Println("shit2")
 	if err != nil {
 		fmt.Println(err)
 	}
 	defer l.Close()
 	for {
+		fmt.Println("hereeeee")
 		c, err := l.Accept()
+		fmt.Println("penis")
 		if err != nil {
 			fmt.Println(err)
 		}

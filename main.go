@@ -2,7 +2,6 @@ package main
 
 import (
 	"./unicast"
-	"bufio"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,7 +9,6 @@ import (
 	"io/ioutil"
 	"os"
 	"strconv"
-	"sync"
 )
 
 // go run main.go 1234
@@ -63,20 +61,22 @@ func parseInput(source *string) (unicast.UserInput, unicast.Connection) {
 func openTCPServerConnections(source *string, valueChan chan unicast.UserInput) error {
 	// Need to send the source string in here so we know what port to look for
 	// openPort, err := unicast.ScanConfigForServer(*source)
+	fmt.Println("we are here in the openTCP", *source)
 	if *source == "" {
 		return errors.New("Source string is incorrect")
 	}
 	unicast.ConnectToTCPClient(*source, valueChan)
+	return nil
 }
 
-func parseJson(source *string) (unicast.UserInput, unicast.Connections) {
+func parseJSON(source *string) (unicast.UserInput, unicast.Connections) {
 	config, err := os.Open("config.json")
 	if err != nil {
 		fmt.Println(err)
 	}
 	var connections unicast.Connections
 	byteValue, err := ioutil.ReadAll(config)
-	json.Unmarshal(byteValue, connections)
+	json.Unmarshal(byteValue, &connections)
 	var initialNode unicast.UserInput
 	for i := 0; i < len(connections.Connections); i++ {
 		if connections.Connections[i].Port == *source {
@@ -98,7 +98,7 @@ func parseJson(source *string) (unicast.UserInput, unicast.Connections) {
 	@params: {UserInput}, {Connection}, {WaitGroup}
 	@returns: N/A
 */
-func unicastSend(inputStruct unicast.UserInput, connection unicast.Connections, wg *sync.WaitGroup) {
+func unicastSend(inputStruct unicast.UserInput, connection unicast.Connections) {
 	//defer wg.Done()
 	// Send the message using UserInput struct and Connection struct to easily pass around data
 	unicast.SendMessage(inputStruct, connection)
@@ -114,14 +114,16 @@ func main() {
 	}
 	s := strconv.Itoa(*i)
 
+	// s is the source
+
 	valueChannel := make(chan unicast.UserInput)
+
+	// pass in the source to listen to it
 	go openTCPServerConnections(&s, valueChannel)
 
-	inputStruct, connection := parseJson(&s)
+	inputStruct, connection := parseJSON(&s)
 
-	go unicastSend(inputStruct, connection, &wg)
+	unicastSend(inputStruct, connection)
 
-	var message unicast.UserInput
-	message <- valueChannel
 
 }

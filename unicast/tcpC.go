@@ -7,9 +7,8 @@ import (
 	"os"
 	"io/ioutil"
 	"encoding/json"
-	"../util"
+	"../utils"
 	"strings"
-	"sync"
 )
 
 
@@ -52,7 +51,7 @@ func (cli *Client) sendUserToServer() (err error){
 	@params: chan {Message}
 	@returns: error
 */
-func (cli *Client) RunCli(messageChan chan util.Message, ) (err error) {
+func (cli *Client) RunCli() (err error) {
 	
 	connection, err := cli.readJSONForClient(cli.Username)
 	if err != nil {
@@ -65,19 +64,9 @@ func (cli *Client) RunCli(messageChan chan util.Message, ) (err error) {
 	}
 
 	for {
-		messageData := <- messageChan
-		if messageData.Message == "EXIT" {
-			wg.Done()
-			break
-		} else if messageData.Receiver == "Client Not Connected" {
-			fmt.Println("Client not connected")
-		}
-		fmt.Println(messageData)
-		go cli.sendMessageToServer(cli.client, messageData)
+		go cli.sendMessageToServer(cli.client)
 	}
-	wg.Done()
-	fmt.Println("outside the for loop here now")
-	wg.Wait()
+
 	return
 
 }
@@ -90,7 +79,7 @@ func (cli *Client) RunCli(messageChan chan util.Message, ) (err error) {
 	@params: net.Conn, chan {Message}
 	@returns: error
 */
-func (cli *Client) sendMessageToServer(conn net.Conn, messageData util.Message) (err error) {
+func (cli *Client) sendMessageToServer(conn net.Conn) (err error) {
 	
 
 	jsonData, err := json.Marshal(messageData)
@@ -104,33 +93,6 @@ func (cli *Client) sendMessageToServer(conn net.Conn, messageData util.Message) 
 	return
 }
 
-/*
-	@function: listenForMessage
-	@description: Listens for a message from the server and deserializes it 
-	@exported: false
-	@family: Client
-	@params: net.Conn, chan {Message}
-	@returns: error
-*/
-func (cli *Client) listenForMessage(conn net.Conn, messageChan chan util.Message) (err error) {
-	for {
-		decoder := json.NewDecoder(conn)
-		var mess util.Message
-		decoder.Decode(&mess)
-
-		if mess.Message == "error" {
-			messageChan <- util.Message{"Client Not Connected", "", ""}
-			return errors.New("Person not connected yet")
-		} else if mess.Message == "EXIT" {
-			conn.Close()
-			os.Exit(0)
-			messageChan <- util.Message{"","EXIT",""}
-		} else if mess.Message != "" {
-			fmt.Printf("Received the message from" + strings.TrimSpace(mess.Sender) + "\n") 
-			fmt.Printf("Message:" + strings.TrimSpace(mess.Message))
-		}
-	}
-}
 
 
 

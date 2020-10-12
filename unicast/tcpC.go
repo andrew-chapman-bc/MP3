@@ -14,8 +14,9 @@ import (
 
 // Client holds the structure of our TCP Client implementation
 type Client struct {
-	Username string
+	port string
 	client net.Conn
+	Connections utils.Connections
 }
 
 /*
@@ -26,22 +27,17 @@ type Client struct {
 	@params: string
 	@returns: {*Client}, error
 */
-func NewTCPClient(username string) (*Client, error) {
-	client := Client{Username: username}
+func NewTCPClient(port string, connections utils.Connections) (*Client, error) {
+	client := Client{port: port, Connections: connections}
 	// if username is empty -> throw error
-	if username == "" {
+	if port == "" {
 		fmt.Println("error here 1")
-		return nil, errors.New("Error: Address not found")
+		return nil, errors.New("Error: Port not found")
 	}
 
 	return &client, nil
 }
 
-
-func (cli *Client) sendUserToServer() (err error){
-	fmt.Fprintf(cli.client, cli.Username + "\n")
-	return
-}
 
 /*
 	@function: RunCli
@@ -52,22 +48,13 @@ func (cli *Client) sendUserToServer() (err error){
 	@returns: error
 */
 func (cli *Client) RunCli() (err error) {
-	
-	connection, err := cli.readJSONForClient(cli.Username)
-	if err != nil {
-		return err
-	}
-	fmt.Println(connection.Port)
-	cli.client, err = net.Dial("tcp", connection.Port)
+	fmt.Println(cli.port)
+	cli.client, err = net.Dial("tcp", cli.port)
 	if err != nil {
 		return err
 	}
 
-	for {
-		go cli.sendMessageToServer(cli.client)
-	}
-
-	return
+	return nil
 
 }
 
@@ -79,7 +66,7 @@ func (cli *Client) RunCli() (err error) {
 	@params: net.Conn, chan {Message}
 	@returns: error
 */
-func (cli *Client) sendMessageToServer(conn net.Conn) (err error) {
+func (cli *Client) sendMessageToServer(messageData utils.Message) (err error) {
 	
 
 	jsonData, err := json.Marshal(messageData)
@@ -87,13 +74,11 @@ func (cli *Client) sendMessageToServer(conn net.Conn) (err error) {
 		return err
 	}
 
-	encoder := json.NewEncoder(conn)
+	encoder := json.NewEncoder(cli.client)
 	encoder.Encode(jsonData)
 	fmt.Println("data sent!", messageData)
 	return
 }
-
-
 
 
 /*

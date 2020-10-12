@@ -29,18 +29,43 @@ func getCmdLine() string {
 }
 
 func main() {
-	
+
+	messageChannel := make(chan message)
 	s := getCmdLine()
+	
+	
 	connections, err := utils.GetConnections()
 	if err != nil {
 		fmt.Println("Error reading json", err)
 	}
+	
+	
 	var serv *unicast.Server
 	port := cmdLineArr[1]
-	serv, err := unicast.NewTCPServer(port)
+	serv, err := unicast.NewTCPServer(port, connections)
 	if err != nil {
 		fmt.Println(err)
 	}
+	
+	
+	go func() {
+		err := unicast.serv.RunServ(messageChannel)
+	}
+
+	portArr := utils.GetConnectionsPorts(connections)
+	var cliArr [3]*unicast.Client
+	for index, _ := range cliArr {
+		cli, err := unicast.NewTCPClient(portArr[index], connections)
+		cliArr[index] = cli
+	}
+
+	go func() {
+		newMessage := <- messageChannel
+		for index, client := range cliArr {
+			unicast.client.sendMessageToServer(newMessage)
+		}
+	}
+	// 
 
 
 }

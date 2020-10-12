@@ -6,10 +6,9 @@ import (
 	"os"
 	"io/ioutil"	
 	"encoding/gob"
+	"encoding/json"
 	"errors"
 	"../utils"
-	"sync"
-	"bufio"
 )
 
 
@@ -31,8 +30,8 @@ type Server struct {
 	@params: string
 	@returns: {*Server}, error
 */
-func NewTCPServer(port string) (*Server, error) {
-	server := Server{port: port}
+func NewTCPServer(port string, connections utils.Connections) (*Server, error) {
+	server := Server{port: port, Connections: connections}
 
 	// if port is empty -> throw error
 	if port == "" {
@@ -50,7 +49,7 @@ func NewTCPServer(port string) (*Server, error) {
 	@params: chan string, chan bool, waitgroup
 	@returns: error
 */
-func (serv *Server) RunServ() (err error) {
+func (serv *Server) RunServ(messageChannel chan utils.Message) (err error) {
 	
 	serv.server, err = net.Listen("tcp", ":" + serv.port)
     if err != nil {
@@ -61,7 +60,7 @@ func (serv *Server) RunServ() (err error) {
 	defer serv.server.Close()
 
     for {
-		serv.handleConnections(serv.server)
+		serv.handleConnections(serv.server, messageChannel)
 		// break here when calculation is good 
     }
     return
@@ -74,15 +73,15 @@ func (serv *Server) RunServ() (err error) {
 	@params: map[string]net.Conn, chan bool, WaitGroup
 	@returns: error
 */
-func (serv *Server) handleConnections() (err error) {
+func (serv *Server) handleConnections(conn net.Listener, messageChannel chan utils.Message) (err error) {
 	var messages utils.Messages
 	var messagesArr utils.MessagesArr
-	ownState, err := fetchInitialState()
+	ownState, err := serv.fetchInitialState()
 	if err != nil {
 		return err
 	}
 	messages.Messages[0] = ownState
-	messagesArr.MessagesArr[0] = messages.Messages
+	messagesArr.MessagesArr[0].Messages = messages.Messages
 	for {
 		conn, err := serv.server.Accept()
 		
@@ -91,7 +90,7 @@ func (serv *Server) handleConnections() (err error) {
             break
 		}
 
-        go serv.handleConnection(conn, messagesArr)
+        go serv.handleConnection(conn, messagesArr, messageChannel)
 	}
 	
     return
@@ -121,7 +120,7 @@ func (serv *Server) handleConnections() (err error) {
 	] 
 ]
 */
-func (serv *Server) handleConnection(conn net.Conn, messages utils.MessagesArr) (err error) {
+func (serv *Server) handleConnection(conn net.Conn, messagesArr utils.MessagesArr, messageChannel chan utils.Message) (err error) {
 	fmt.Println("ok ok")
 	nodes, err := utils.GetNodeNums()
 	if err != nil {
@@ -131,19 +130,23 @@ func (serv *Server) handleConnection(conn net.Conn, messages utils.MessagesArr) 
 	var mess utils.Message
     for {
 		fmt.Println(mess)
-		err := gob.Decode(&mess)
+		err := dec.Decode(&mess)
 		if err != nil {
 			fmt.Println(err)
 			return err
 		}
 		
-		messagesArr.MessagesArr[mess.Round-1].append(messagesArr.MessagesArr[mess.Round-1], mess)
+		messagesArr.MessagesArr[mess.Round-1].Messages = append(messagesArr.MessagesArr[mess.Round-1].Messages, mess)
 		for i, val := range messagesArr.MessagesArr {
-			if len(val) >= (nodes.totalNodes - nodes.faultyNodes) {
-				newMess := utils.CalculateAverage(messagesArr, i)
-				// send this newMess over a channel to be sent 
+			if len(val.Messages) >= (nodes.TotalNodes - nodes.FaultyNodes) {
+				newMess, err := utils.CalculateAverage(messagesArr, i)
+				if err != nil {
+					return err
+				}
+				messageChannel <- newMess
 			}
 		}
+		
 
 
     }
@@ -172,7 +175,7 @@ func (serv *Server) fetchInitialState() (utils.Message, error) {
 	json.Unmarshal(byteValue, &connections)
 	for i := 0; i < len(connections.Connections); i++ {
 		if (connections.Connections[i].Port == serv.port ) {
-			selfState = CreateMessage(connections.Connections[i].State, 1)
+			selfState = utils.CreateMessage(connections.Connections[i].State, 1)
 			return selfState, nil
 		}
 	}

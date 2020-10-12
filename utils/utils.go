@@ -41,8 +41,8 @@ type MessagesArr struct {
 	MessagesArr []Messages
 }
 type NodeNums struct {
-	totalNodes int
-	faultyNodes int
+	TotalNodes int
+	FaultyNodes int
 }
 
 func GetConnections() (Connections, error) {
@@ -88,8 +88,8 @@ func GetNodeNums() (NodeNums, error) {
 
 func createNodesObj(total, faulty int) NodeNums {
 	var nodes NodeNums
-	nodes.totalNodes = total
-	nodes.faultyNodes = faulty
+	nodes.TotalNodes = total
+	nodes.FaultyNodes = faulty
 	return nodes
 }
 
@@ -117,4 +117,12 @@ func CalculateAverage(messagesArr MessagesArr, index int ) (Message, error) {
 	newRound := round + 1
 	newMess = CreateMessage(newStateString, newRound)
 	return newMess, nil
+}
+
+func GetConnectionsPorts(connections Connections) []string {
+	var portArr []string
+	for _, connection := range connections.Connections {
+		portArr = append(portArr, connection.Port)
+	}
+	return portArr
 }

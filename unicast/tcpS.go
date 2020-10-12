@@ -81,8 +81,8 @@ func (serv *Server) handleConnections() (err error) {
 	if err != nil {
 		return err
 	}
-	messages.Messages[0] := ownState
-	messagesArr.MessagesArr[0] := messages.Messages
+	messages.Messages[0] = ownState
+	messagesArr.MessagesArr[0] = messages.Messages
 	for {
 		conn, err := serv.server.Accept()
 		
@@ -105,7 +105,8 @@ func (serv *Server) handleConnections() (err error) {
 	@params: net.Conn, map[string]net.Conn
 	@returns: error
 */
-/*[
+/*
+[
 	[
 		{State Round},
 		{State, Round},

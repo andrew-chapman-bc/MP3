@@ -81,11 +81,15 @@ func (serv *Server) handleConnections(conn net.Listener, messageChannel chan uti
 	if err != nil {
 		return err
 	}
-	messages.Messages[0] = ownState
-	messagesArr.MessagesArr[0].Messages = messages.Messages
+
+	messages.Messages = append(messages.Messages, ownState)
+	messagesArr.MessagesArr = append(messagesArr.MessagesArr, messages)
+	fmt.Println(messagesArr.MessagesArr)
+	messagesArr.MessagesArr[0] = messages
+	fmt.Println("hit this2")
 	for {
 		conn, err := serv.server.Accept()
-		
+		fmt.Println("hith this3")
         if err != nil || conn == nil {
             err = errors.New("Network Error: Could not accept connection")
             break

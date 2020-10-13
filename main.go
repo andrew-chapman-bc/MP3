@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/akamensky/argparse"
 	"os"
+	"sync"
 )
 
 
@@ -27,6 +28,7 @@ func getCmdLine() string {
 
 func main() {
 
+	var wg sync.WaitGroup
 	messageChannel := make(chan utils.Message)
 	s := getCmdLine()
 	
@@ -42,15 +44,22 @@ func main() {
 		fmt.Println(err)
 	}
 	
-	
-	err1 := serv.RunServ(messageChannel)
-	if err1 != nil {
-		fmt.Println(err)
-	}
+
+	wg.Add(1)
+	go func(){
+		defer wg.Done()
+		err1 := serv.RunServ(messageChannel)
+		if err1 != nil {
+			fmt.Println(err)
+		}
+	}()
 
 	portArr := utils.GetConnectionsPorts(connections)
-	var cliArr [3]*unicast.Client
+	portArrLen := len(portArr)
+
+	cliArr := make([]*unicast.Client, portArrLen)
 	for index := range cliArr {
+		fmt.Println(portArr[index])
 		cli, err := unicast.NewTCPClient(portArr[index], connections)
 		if err != nil {
 			fmt.Println(err)
@@ -58,17 +67,21 @@ func main() {
 		cliArr[index] = cli
 	}
 
+	wg.Add(1)
 	go func() {
-		newMessage := <- messageChannel
-		for _, client := range cliArr {
-			err := client.SendMessageToServer(newMessage)
-			if err != nil {
-				fmt.Println(err)
+		for {
+			newMessage := <- messageChannel
+			fmt.Println(newMessage)
+			for _, client := range cliArr {
+				err := client.SendMessageToServer(newMessage)
+				if err != nil {
+					fmt.Println(err)
+				}
 			}
 		}
 	}()
 	// 
-
+	wg.Wait()
 
 }
 

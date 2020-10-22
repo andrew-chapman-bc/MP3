@@ -3,12 +3,12 @@ package unicast
 import (
 	"../utils"
 	"encoding/gob"
-	"encoding/json"
+	//"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
-	"os"
+	//"os"
 )
 
 
@@ -49,16 +49,15 @@ func NewTCPServer(port string, connections utils.Connections) (*Server, error) {
 	@params: chan string, chan bool, waitgroup
 	@returns: error
 */
-func (serv *Server) RunServ(messageChannel chan utils.Message) (err error) {
-	fmt.Println("connected to", serv.port)
-	serv.server, err = net.Listen("tcp", serv.Connections.IP + ":" + serv.port)
+func (serv *Server) RunServ(messageChannel chan utils.Message) ( err error) {
+	serv.server, err = net.Listen("tcp", ":" + serv.port)
     if err != nil {
 		fmt.Println("we did not connect")
         return err
 	}
 	fmt.Println("Listening to the port:", serv.port)
 	
-	defer serv.server.Close()
+	//defer serv.server.Close()
 
     for {
 		serv.handleConnections(serv.server, messageChannel)
@@ -75,23 +74,12 @@ func (serv *Server) RunServ(messageChannel chan utils.Message) (err error) {
 	@returns: error
 */
 func (serv *Server) handleConnections(conn net.Listener, messageChannel chan utils.Message) (err error) {
-	var messages utils.Messages
-	var messagesArr utils.MessagesArr
-	ownState, err := serv.fetchInitialState()
-	if err != nil {
-		return err
-	}
-
-	messages.Messages = append(messages.Messages, ownState)
-	messagesArr.MessagesArr = append(messagesArr.MessagesArr, messages)
-	fmt.Println(messagesArr.MessagesArr)
-	messagesArr.MessagesArr[0] = messages
-	fmt.Println("hit this2")
+	var messagesArr utils.Messages
 	for {
 		conn, err := serv.server.Accept()
-		fmt.Println("hith this3")
         if err != nil || conn == nil {
-            err = errors.New("Network Error: Could not accept connection")
+			err = errors.New("Network Error: Could not accept connection")
+			fmt.Println(err)
             break
 		}
 
@@ -116,14 +104,14 @@ func (serv *Server) handleConnections(conn net.Listener, messageChannel chan uti
 		
 	],
 	[
-		{State Round},
-		{State, Round},
-		{State Round},
-		{State Round}
+		{State Round2},
+		{State, Round2},
+		{State Round2},
+		{State Round2}
 	] 
 ]
 */
-func (serv *Server) handleConnection(conn net.Conn, messagesArr utils.MessagesArr, messageChannel chan utils.Message) (err error) {
+func (serv *Server) handleConnection(conn net.Conn, messagesArr utils.Messages, messageChannel chan utils.Message) (err error) {
 	fmt.Println("ok ok")
 	nodes, err := utils.GetNodeNums()
 	if err != nil {
@@ -131,58 +119,21 @@ func (serv *Server) handleConnection(conn net.Conn, messagesArr utils.MessagesAr
 	}
 	dec := gob.NewDecoder(conn)
 	var mess utils.Message
-    for {
-		fmt.Println(mess)
-		err := dec.Decode(&mess)
+	var messages utils.Messages
+	counter := 0
+    for (err != io.EOF) {
+		err = dec.Decode(&mess)
+		fmt.Println("this is the message", mess)
+		// .1234, 1
 		if err != nil {
-			fmt.Println(err)
+			fmt.Println("hit this: ", err)
 			return err
 		}
-		
-		messagesArr.MessagesArr[mess.Round-1].Messages = append(messagesArr.MessagesArr[mess.Round-1].Messages, mess)
-		for i, val := range messagesArr.MessagesArr {
-			if len(val.Messages) >= (nodes.TotalNodes - nodes.FaultyNodes) {
-				newMess, err := utils.CalculateAverage(messagesArr, i)
-				if err != nil {
-					return err
-				}
-				messageChannel <- newMess
-			}
-		}
-		
-
-
-    }
+		messages.Messages = append(messages.Messages, mess)
+		fmt.Println("messages array is", messagesArr)
+		//TODO: stuff
+	}
+	return
 }
 
-
-
-/*
-	@function: readJSONForServer
-	@description: Reads the JSON and returns a struct which contains 
-		the type, port, username and IP
-	@exported: False
-	@family: Server
-	@params: string
-	@returns: Connections
-*/
-func (serv *Server) fetchInitialState() (utils.Message, error) {
-	jsonFile, err := os.Open("config.json")
-	var connections utils.Connections
-	var selfState utils.Message
-	if err != nil {
-		fmt.Println(err)
-		return selfState, err
-	}
-	byteValue, _ := ioutil.ReadAll(jsonFile)
-	json.Unmarshal(byteValue, &connections)
-	for i := 0; i < len(connections.Connections); i++ {
-		if (connections.Connections[i].Port == serv.port ) {
-			selfState = utils.CreateMessage(connections.Connections[i].State, 1)
-			return selfState, nil
-		}
-	}
-
-	return selfState, errors.New("Could not find own state?")
-}
 

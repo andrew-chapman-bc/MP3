@@ -2,10 +2,13 @@ package unicast
 
 import (
 	"../utils"
+	"encoding/gob"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
+	"os"
+	"io/ioutil"
 )
 
 
@@ -45,8 +48,7 @@ func NewTCPClient(port string, connections utils.Connections) (*Client, error) {
 	@returns: error
 */
 func (cli *Client) RunCli() (err error) {
-	fmt.Println(cli.port)
-	cli.client, err = net.Dial("tcp", cli.port)
+	cli.client, err = net.Dial("tcp", cli.Connections.IP + ":" + cli.port)
 	if err != nil {
 		return err
 	}
@@ -66,13 +68,34 @@ func (cli *Client) RunCli() (err error) {
 func (cli *Client) SendMessageToServer(messageData utils.Message) (err error) {
 	
 
-	jsonData, err := json.Marshal(messageData)
+	encoder := gob.NewEncoder(cli.client)
+	encoder.Encode(messageData)
 	if err != nil {
+		fmt.Println(err)
 		return err
 	}
-
-	encoder := json.NewEncoder(cli.client)
-	encoder.Encode(jsonData)
-	fmt.Println("data sent!", messageData)
+	fmt.Println("data sent to ", cli.port, messageData)
 	return
 }
+
+
+func (cli *Client) FetchInitialState() (utils.Message, error) {
+	jsonFile, err := os.Open("config.json")
+	var connections utils.Connections
+	var selfState utils.Message
+	if err != nil {
+		fmt.Println(err)
+		return selfState, err
+	}
+	byteValue, _ := ioutil.ReadAll(jsonFile)
+	json.Unmarshal(byteValue, &connections)
+	for i := 0; i < len(connections.Connections); i++ {
+		if (connections.Connections[i].Port == cli.port ) {
+			selfState = utils.CreateMessage(connections.Connections[i].State, 1)
+			return selfState, nil
+		}
+	}
+
+	return selfState, errors.New("Could not find own state?")
+}
+

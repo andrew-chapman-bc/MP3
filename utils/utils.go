@@ -37,9 +37,7 @@ type Message struct {
 type Messages struct {
 	Messages []Message
 }
-type MessagesArr struct {
-	MessagesArr []Messages
-}
+
 type NodeNums struct {
 	TotalNodes int
 	FaultyNodes int
@@ -93,27 +91,24 @@ func createNodesObj(total, faulty int) NodeNums {
 	return nodes
 }
 
-func CalculateAverage(messagesArr MessagesArr, index int ) (Message, error) {
-	total := 0
-	divisor := 0
+
+func CalculateAverage(messages Messages, index int) (Message, error) {
+	total := 0.00
+	divisor := 0.00
 	var newMess Message
-	var round int
-	for i := 0; i < len(messagesArr.MessagesArr); i++ {
-		if (i == index) {
-			for j := 0; j < len(messagesArr.MessagesArr[i].Messages); j++ {
-				state := messagesArr.MessagesArr[i].Messages[j].State
-				round = messagesArr.MessagesArr[i].Messages[j].Round
-				stateInt, err := strconv.Atoi(state)
-				if err != nil {
-					return newMess, err
-				}
-				total += stateInt
-				divisor++
+	var round = index
+	for i := 0; i < len(messages.Messages); i++ {
+		if (messages.Messages[i].Round == index) {
+			stateFloat, err := strconv.ParseFloat(messages.Messages[i].State, 64)
+			if err != nil {
+				return newMess, err
 			}
+			total += stateFloat
+			divisor++
 		}
 	}
 	newState := total/divisor
-	newStateString := strconv.Itoa(newState)
+	newStateString := strconv.FormatFloat(newState, 'f', 4, 64)
 	newRound := round + 1
 	newMess = CreateMessage(newStateString, newRound)
 	return newMess, nil

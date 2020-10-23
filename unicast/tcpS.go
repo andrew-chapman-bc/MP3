@@ -100,9 +100,9 @@ func (serv *Server) handleConnections(conn net.Listener, messageChannel chan uti
 */
 func (serv *Server) handleConnection(conn net.Conn, messagesArr utils.Messages, messageChannel chan utils.Message) (err error) {
 	fmt.Println("ok ok")
-	dec := gob.NewDecoder(conn)
 	var mess utils.Message
     for (err != io.EOF) {
+		dec := gob.NewDecoder(conn)
 		err = dec.Decode(&mess)
 		fmt.Println("Received message:", mess)
 
@@ -110,6 +110,7 @@ func (serv *Server) handleConnection(conn net.Conn, messagesArr utils.Messages, 
 			fmt.Println(err)
 			return err
 		}
+
 		messageChannel <- mess
 	}
 	return

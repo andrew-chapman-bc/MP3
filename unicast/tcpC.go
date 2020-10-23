@@ -66,7 +66,12 @@ func (cli *Client) RunCli() (err error) {
 	@returns: error
 */
 func (cli *Client) SendMessageToServer(messageData utils.Message) (err error) {
-	
+	delay, err := utils.GetDelayParams()
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+	utils.GenerateDelay(delay)
 	encoder := gob.NewEncoder(cli.client)
 	encoder.Encode(messageData)
 	if err != nil {

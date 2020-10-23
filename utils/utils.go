@@ -7,6 +7,10 @@ import (
 	"errors"
 	"io/ioutil"
 	"strconv"
+	"math"
+	"fmt"
+	"math/rand"
+	"time"
 )
 /*
 	Connections: []Connection
@@ -15,6 +19,9 @@ import (
 type Connections struct {
 	Connections []Connection `json:"connections"`
 	IP string `json:"IP"`
+	Delays Delay `json:"Delay"`
+	Consensus bool `json:"Consensus"`
+	Round int `json:"Round"`
 } 
 
 /*
@@ -50,6 +57,11 @@ type Messages struct {
 type NodeNums struct {
 	TotalNodes int
 	FaultyNodes int
+}
+
+type Delay struct {
+	minDelay int
+	maxDelay int	
 }
 
 /*
@@ -103,6 +115,7 @@ func GetNodeNums() (NodeNums, error) {
 	}
 	byteValue, _ := ioutil.ReadAll(jsonFile)
 	json.Unmarshal(byteValue, &connections)
+	jsonFile.Close()
 	for _, val := range connections.Connections {
 		if (val.Status == "") {
 			totalNodes++
@@ -169,4 +182,165 @@ func GetConnectionsPorts(connections Connections) []string {
 		portArr = append(portArr, connection.Port)
 	}
 	return portArr
+}
+
+/*
+	@function: CheckForConsensus
+	@description: checks for consensus and returns true when we reach approximate consensus
+	@exported: True
+	@params: Messages
+	@returns: bool, error
+*/
+func CheckForConsensus(messageQueue Messages) (bool, error) {
+	messageArr := messageQueue.Messages
+	firstVal, err := strconv.ParseFloat(messageArr[0].State, 64)
+	if err != nil {
+		fmt.Println(err)
+		return false, err
+	}
+	for i := 1; i < len(messageArr); i++ {
+		curVal, err := strconv.ParseFloat(messageArr[i].State, 64)
+		if err != nil {
+			fmt.Println(err)
+			return false, err
+		}
+		if (math.Abs(curVal - firstVal) > .001) {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+
+/*
+	@function: createDelayStruct
+	@description: creates a delay struct
+	@exported: False
+	@params: int, int
+	@returns: Delay
+*/
+func createDelayStruct(minDelay, maxDelay int) Delay {
+	var delay Delay
+	delay.minDelay = minDelay
+	delay.maxDelay = maxDelay
+	return delay
+}
+
+/*
+	@function: GetDelayParams
+	@description: gets delay parameters from the json and creates a delay struct to return
+	@exported: True
+	@params: N/A
+	@returns: Delay, error
+*/
+func GetDelayParams() (Delay, error) {
+	var connections Connections
+	var delayStruct Delay
+	jsonFile, err := os.Open("config.json")
+	if err != nil {
+		return delayStruct, err
+	}
+	byteValue, _ := ioutil.ReadAll(jsonFile)
+	json.Unmarshal(byteValue, &connections)
+	jsonFile.Close()
+	minDelay := connections.Delays.minDelay
+	maxDelay := connections.Delays.maxDelay
+	delayStruct = createDelayStruct(minDelay, maxDelay)
+	return delayStruct, nil
+}
+
+/*
+	@function: GenerateDelay
+	@description: takes in a delay struct and generates a delay using time.sleep
+	@exported: True
+	@params: Delay
+	@returns: N/A
+*/
+func GenerateDelay(delayStruct Delay) {
+	rand.Seed(time.Now().UnixNano())
+	delayTime := rand.Intn(delayStruct.maxDelay - delayStruct.minDelay + 1) + delayStruct.minDelay
+	time.Sleep(time.Duration(delayTime) * time.Millisecond)
+}
+
+/*
+	@function: ChangeJSONRound
+	@description: Changes the Round field in JSON to the parameter
+	@exported: True
+	@params: int
+	@returns: error
+*/
+func SetJSONRound(round int) error {
+	var connections Connections
+	jsonFile, err := os.Open("config.json")
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+	byteValue, _ := ioutil.ReadAll(jsonFile)
+	json.Unmarshal(byteValue, &connections)
+	connections.Round = round
+	jsonData, err := json.Marshal(connections)
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+	err = ioutil.WriteFile("config.json", jsonData, 0777)
+	if err != nil {
+		fmt.Println(err)
+	}
+	jsonFile.Close()
+	return nil
+}
+
+
+func GetJSONRound() (int, error) {
+	var connections Connections
+	var round int
+	jsonFile, err := os.Open("config.json")
+	if err != nil {
+		fmt.Println(err)
+		return round, err
+	}
+	byteValue, _ := ioutil.ReadAll(jsonFile)
+	json.Unmarshal(byteValue, &connections)
+	round = connections.Round 
+	return round, nil
+}
+
+func GetJSONConsensus() (bool, error) {
+	var connections Connections
+	var consensus bool
+	jsonFile, err := os.Open("config.json")
+	if err != nil {
+		fmt.Println(err)
+		return consensus,err
+	}
+	byteValue, _ := ioutil.ReadAll(jsonFile)
+	json.Unmarshal(byteValue, &connections)
+	consensus = connections.Consensus
+	jsonFile.Close()
+	return consensus, nil
+}
+
+func SetJSONConsensus(consensus bool) error {
+	var connections Connections
+	jsonFile, err := os.Open("config.json")
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+	byteValue, _ := ioutil.ReadAll(jsonFile)
+	json.Unmarshal(byteValue, &connections)
+	connections.Consensus = consensus
+	jsonData, err := json.Marshal(connections)
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+	err = ioutil.WriteFile("config.json", jsonData, 0777)
+	if err != nil {
+		fmt.Println(err)
+	}
+	jsonFile.Close()
+	return nil
 }

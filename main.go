@@ -30,7 +30,6 @@ func getCmdLine() string {
 
 
 func main() {
-
 	var wg sync.WaitGroup
 	messagesChannel := make(chan utils.Message)
 	s := getCmdLine()
@@ -81,7 +80,7 @@ func main() {
 	for index := range cliArr {
 		// 1234 will always be the first cli here
 		// Need to make it so we send our port's data over first instead of always 1234
-		time.Sleep(20 * time.Second)
+		time.Sleep(3 * time.Second)
 		if portArr[index] == port {
 			err5 := cliArr[index].SendMessageToServer(state)
 			if err5 != nil {
@@ -114,40 +113,57 @@ func main() {
 		fmt.Println(err)
 	}
 	wg.Add(1)
+	round := 1
 	go func() {
-		fmt.Println("hi")
-		for len(messageQueue.Messages) < (nodes.TotalNodes - nodes.FaultyNodes) {
-			message := <- messagesChannel
-			messageQueue.Messages = append(messageQueue.Messages, message)
-			fmt.Println("This is the messages queue", messageQueue)
-		}
-		round := 1
 		receivedNodes := 0
 		isDone := false
-		for !isDone {
-			for _, val := range messageQueue.Messages {
-				if (val.Round == round) {
-					receivedNodes++;
+		consensusReached := false
+		for !consensusReached {
+			for len(messageQueue.Messages) < (nodes.TotalNodes - nodes.FaultyNodes) {
+				message := <- messagesChannel
+				if (message.Round == round) {
+					messageQueue.Messages = append(messageQueue.Messages, message)
 				}
-				if (receivedNodes > nodes.TotalNodes - nodes.FaultyNodes) {
-					fmt.Println("calculating avg for andy using: ", messageQueue)
-					avg, err := utils.CalculateAverage(messageQueue, round)
-					if err != nil {
-						fmt.Println(err)
+				fmt.Println("This is the messages queue", messageQueue)
+			}
+			for !isDone {
+				for _, val := range messageQueue.Messages {
+					if (val.Round == round) {
+						receivedNodes++;
 					}
-					for _, client := range cliArr {
-						fmt.Println("sending here")
-						client.SendMessageToServer(avg)
+					if (receivedNodes > nodes.TotalNodes - nodes.FaultyNodes) {
+						fmt.Println("calculating avg for andy using: ", messageQueue)
+						avg, err := utils.CalculateAverage(messageQueue, round)
+						if err != nil {
+							fmt.Println(err)
+						}
+						for _, client := range cliArr {
+							fmt.Println("sending here")
+							client.SendMessageToServer(avg)
+						}
+						isDone = true
+						round++
+						err = utils.SetJSONRound(round)
+						if err != nil {
+							fmt.Println(err)
+						}
+						break
 					}
-					isDone = !isDone
-					round++
-					break
 				}
 			}
+			isDone = false
+			receivedNodes = 0
+			consensusReached, err = utils.CheckForConsensus(messageQueue)
+			messageQueue.Messages = nil
+			if err != nil {
+				fmt.Println(err)
+			}
 		}
+		utils.SetJSONConsensus(true)
 	}()
 	// 
 	wg.Wait()
 
 }
+
 

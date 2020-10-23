@@ -1,153 +1,112 @@
 package unicast
 
 import (
+	"../utils"
 	"encoding/gob"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
+	"os"
+	"io/ioutil"
 )
 
-// UserInput holds state, source, and round number of client
-type UserInput struct {
-	State     float64
-	Source 	  string
-	Round     int
-}
 
-// Delay keeps track of delay bounds from config
-type Delay struct {
-	minDelay string
-	maxDelay string
+// Client holds the structure of our TCP Client implementation
+type Client struct {
+	port string
+	client net.Conn
+	Connections utils.Connections
 }
 
 /*
-	Type: "Server"/"Client" whether it's server or client
-	Port: "1234", etc. Port attached to username
-	Username: name of connection
-	IP: IP address to connect to
-*/
-type Connection struct {
-	Port string `json:"Port"`
-	State string `json:"State"`
-	Status string `json:"Status"`
-}
-
-/*
-	Connections: []Connection
-	IP: IP Address to connect to
-*/
-type Connections struct {
-	Connections []Connection `json:"connections"`
-	IP string `json:"IP"`
-}
-
-/*
-	@function: ScanConfigForClient
-	@description: Scans the config file using the user input destination and retrieves the ip/port that will later be used to connect to the TCP server
+	@function: NewTCPClient
+	@description: Creates a Client instance which can be used in the main function
 	@exported: True
-	@params: {userInput} 
-	@returns: {Connection}
+	@family: N/A
+	@params: string, connections
+	@returns: {*Client}, error
 */
-/*
-func ScanConfigForClient(userInput UserInput) Connection {
-
-	destination := userInput.Destination
-	
-	// Open up config file
-	// TODO: create a variable which holds the destination of config file instead of hardcoding here
-	config, err := os.Open("config.txt")
-	if err != nil {
-		log.Fatal(err)
+func NewTCPClient(port string, connections utils.Connections) (*Client, error) {
+	client := Client{port: port, Connections: connections}
+	// if username is empty -> throw error
+	if port == "" {
+		fmt.Println("error here 1")
+		return nil, errors.New("Error: Port not found")
 	}
 
-	scanner := bufio.NewScanner(config)
-	scanner.Split(bufio.ScanLines)
-	var connection Connection
-	counter := 0
-	for {
-		success := scanner.Scan()
-		if success == false {
-			err = scanner.Err()
-			if err == nil {
-				break
-			} else {
-				log.Fatal(err)
-				break
-			}
-		}
-		if counter != 0 {
-			// TODO: should do some more error handling here to make sure they are accurate ports/ips in the config
-			configArray := strings.Fields(scanner.Text())
-			if configArray[0] == destination {
-				connection.ip = configArray[1]
-				connection.port = configArray[2]
-				connection.source = userInput.Source
-			}
-		}
-		counter++
-	}
-	return connection
+	return &client, nil
 }
-*/
+
 
 /*
-	@function: connectToTCPServer
-	@description:	Connects to the TCP server with the ip/port obtained from config file as a parameter and 
-					returns the connection to the server which will later be used to write to the server
-	@exported: false
-	@params: string 
-	@returns: net.Conn, err
+	@function: RunCli
+	@description: Starts the TCP client (Dials)
+	@exported: True
+	@family: Client
+	@params: N/A
+	@returns: error
 */
-func connectToTCPServer(connect string) (net.Conn, error) {
-	// Dial in to the TCP Server, return the connection to it
-	c, err := net.Dial("tcp", connect)
+func (cli *Client) RunCli() (err error) {
+	cli.client, err = net.Dial("tcp", cli.Connections.IP + ":" + cli.port)
+	if err != nil {
+		return err
+	}
+
+	return nil
+
+}
+
+/*
+	@function: SendMessageToServer
+	@description: Reads the message channel and sends the data over to server using GOB
+	@exported: True
+	@family: Client
+	@params: chan {Message}
+	@returns: error
+*/
+func (cli *Client) SendMessageToServer(messageData utils.Message) (err error) {
+	delay, err := utils.GetDelayParams()
 	if err != nil {
 		fmt.Println(err)
-		return nil, nil
+		return err
 	}
-
-	return c, err
-} 
+	utils.GenerateDelay(delay)
+	encoder := gob.NewEncoder(cli.client)
+	encoder.Encode(messageData)
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+	// fmt.Println("Sent data to ", cli.port, messageData)
+	return
+}
 
 /*
-	@function: SendMessage
-	@description: 	SendMessage sends the message from TCPClient to TCPServer by connecting to the server and 
-					using the Fprintf function to send the message.
+	@function: FetchInitialState
+	@description: Returns the initial state of the active node
 	@exported: True
-	@params: {UserInput}, {Connection}
-	@returns: N/A
+	@family: Client
+	@params: N/A
+	@returns: Message, error
 */
-func SendMessage( messageParams UserInput, connection Connections ) {
-	var destination string
-	roundCounter := 1
-	for i := 0; i < len(connection.Connections); i++ {
-		if connection.Connections[i].Port == messageParams.Source {
-			continue
+func (cli *Client) FetchInitialState() (utils.Message, error) {
+	jsonFile, err := os.Open("config.json")
+	var connections utils.Connections
+	var selfState utils.Message
+	if err != nil {
+		fmt.Println(err)
+		return selfState, err
+	}
+	byteValue, _ := ioutil.ReadAll(jsonFile)
+	json.Unmarshal(byteValue, &connections)
+	for i := 0; i < len(connections.Connections); i++ {
+		if (connections.Connections[i].Port == cli.port ) {
+			selfState = utils.CreateMessage(connections.Connections[i].State, 1)
+			return selfState, nil
 		}
-		destination = connection.Connections[i].Port
-		connectionString := connection.IP + ":" + destination
-		c, err := connectToTCPServer(connectionString)
-		if err != nil {
-			fmt.Println("Network Error: ", err)
-		}
-
-		if err != nil {
-			fmt.Println("Error: ", err)
-		}
-
-
-		messageParams.Round = roundCounter
-
-		encoder := gob.NewEncoder(c)
-		encoder.Encode(messageParams)
 	}
 
-
-
-	// Sending the message to TCP Server
-	// Easier to send this over as strings since it is only one message, we want the source to know where it comes from
-	//fmt.Fprintf(c, messageParams.Message + " " + messageParams.Source + "\n")
-	//timeOfSend := time.Now().Format("02 Jan 06 15:04:05.000 MST")
-	//fmt.Println("Sent message " + messageParams.Message + " to destination " + messageParams.Destination + " system time is: " + timeOfSend)
-	
-} 
+	return selfState, errors.New("Could not find own state?")
+}
 

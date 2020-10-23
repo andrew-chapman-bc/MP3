@@ -2,128 +2,219 @@ package main
 
 import (
 	"./unicast"
-	"encoding/json"
-	"errors"
+	"./utils"
 	"fmt"
 	"github.com/akamensky/argparse"
-	"io/ioutil"
 	"os"
+	"sync"
+	"time"
+	"strings"
 	"strconv"
 )
 
-// go run main.go 1234
-//.5
 
-/*
-	@function: getInput
-	@description: gets the input entered through I/O and packages it into an array that will be used to create a {UserInput}
-	@exported: False
-	@params: N/A
-	@returns: []string
-*/
-/*
-func getInput() float64 {
-	fmt.Println("Enter input >> ")
-	reader := bufio.NewReader(os.Stdin)
-	input, _ := reader.ReadString('\n')
-	s, err := strconv.ParseFloat(input, 64)
+
+
+
+func getCmdLine() string {
+	// Use argparse library to get accurate command line data
+	parser := argparse.NewParser("", "Concurrent TCP Channels")
+	s := parser.String("s", "string", &argparse.Options{Required: true, Help: "String to print"})
+	err := parser.Parse(os.Args)
 	if err != nil {
-		return s
+		// In case of error print error and print usage
+		// This can also be done by passing -h or --help flags
+		fmt.Print(parser.Usage(err))
 	}
-	return 0
+	return *s
 }
-*/
-/*
-	@function: parseInput
-	@description: Parses the UserInput into a {UserInput} and calls ScanConfig() to parse the parameters of TCP connection into a {Connection}
-	@exported: False
-	@params: N/A
-	@returns: {UserInput}, {Connection}
-*/
 
-/*
-func parseInput(source *string) (unicast.UserInput, unicast.Connection) {
-	input := getInput()
-	inputStruct := unicast.CreateUserInputStruct(input, *source)
-	connection := unicast.ScanConfigForClient(inputStruct)
-	return inputStruct, connection
-}
-*/
-
-/*
-	@function: openTCPServerConnections
-	@description: Opens all of the ports defined in the config file using ScanConfigForServer() to get an array of ports 
-					and ConnectToTCPClient() to open them
-	@exported: False
-	@params: {WaitGroup}
-	@returns: N/A
-*/
-func openTCPServerConnections(source *string, valueChan chan unicast.UserInput) error {
-	// Need to send the source string in here so we know what port to look for
-	// openPort, err := unicast.ScanConfigForServer(*source)
-	fmt.Println("we are here in the openTCP", *source)
-	if *source == "" {
-		return errors.New("Source string is incorrect")
+// Have to wait for server to connect before connecting to clients
+func waitForServerToLoad(isLoadedChan chan bool) bool {
+	isLoaded := false
+	for !isLoaded {
+		isLoaded = <- isLoadedChan
 	}
-	unicast.ConnectToTCPClient(*source, valueChan)
-	return nil
+	return true
 }
 
-func parseJSON(source *string) (unicast.UserInput, unicast.Connections) {
-	config, err := os.Open("config.json")
+
+func main() {
+	var wg sync.WaitGroup
+	// Create message channel to move messages around
+	// Create serverChan to make sure we don't dial before listen
+	messagesChannel := make(chan utils.Message)
+	serverFinishedChan := make(chan bool)
+
+	// Get port from command line and connections (json)
+	s := getCmdLine()
+	connections, err := utils.GetConnections()
+	if err != nil {
+		fmt.Println("Error reading json", err)
+	}
+	
+	port := s
+	
+	// Create a server (Listen on port)
+	serv, err := unicast.NewTCPServer(port, connections)
 	if err != nil {
 		fmt.Println(err)
 	}
-	var connections unicast.Connections
-	byteValue, err := ioutil.ReadAll(config)
-	json.Unmarshal(byteValue, &connections)
-	var initialNode unicast.UserInput
-	for i := 0; i < len(connections.Connections); i++ {
-		if connections.Connections[i].Port == *source {
-			s, err := strconv.ParseFloat(connections.Connections[i].State, 64)
+	
+	wg.Add(1)
+
+	// RunServ handles our messages which then get sent back through messagesChan
+	go func() {
+		err1 := serv.RunServ(messagesChannel, serverFinishedChan)
+		if err1 != nil {
+			fmt.Println(err1)
+		}
+		defer wg.Done()
+	}()
+	
+	// Get all of the ports from the config.JSON
+	portArr := utils.GetConnectionsPorts(connections)
+	portArrLen := len(portArr)
+	
+	// Make sure we don't dial before we listen
+	waitForServerToLoad(serverFinishedChan)
+
+	cliArr := make([]*unicast.Client, portArrLen)
+	var state utils.Message
+	// Create our own client
+	for index := range portArr {
+		if portArr[index] == port {
+			cli, err := unicast.NewTCPClient(port, connections)
 			if err != nil {
-				fmt.Println("Error in initial Node")
+				fmt.Println(err)
 			}
-			initialNode.State = s
+			cliArr[index] = cli
+			// Dials in
+			err = cli.RunCli()
+			if err != nil {
+				fmt.Println(err)
+			}
+			// Get the initial state of whatever port we are
+			state, err = cli.FetchInitialState()
+			if err != nil {
+				fmt.Println(err)
+			}
 		}
 	}
-	initialNode.Source = *source
-	return initialNode, connections
-}
-
-/*
-	@function: unicast_send
-	@description: function used as a goroutine to call SendMessage() to pass data from client to server, utilizes waitgroup
-	@exported: False
-	@params: {UserInput}, {Connection}, {WaitGroup}
-	@returns: N/A
-*/
-func unicastSend(inputStruct unicast.UserInput, connection unicast.Connections) {
-	//defer wg.Done()
-	// Send the message using UserInput struct and Connection struct to easily pass around data
-	unicast.SendMessage(inputStruct, connection)
-}
-
-func main() {
-	// Use argparse library to get accurate command line data
-	parser := argparse.NewParser("", "Concurrent TCP Channels")
-	i := parser.Int("i", "int", &argparse.Options{Required: true, Help: "Source destination/identifiers"})
-	err := parser.Parse(os.Args)
-	if err != nil {
-		fmt.Print(parser.Usage(err))
+	faultyRounds := ""
+	for i := 0; i < len(connections.Connections); i++ {
+		if (connections.Connections[i].Port == port) {
+			faultyRounds = connections.Connections[i].Status
+		}
 	}
-	s := strconv.Itoa(*i)
+	
+	// Send messages to all of the clients in the array
+	for index := range cliArr {
+		time.Sleep(3 * time.Second)
+		
+		// Send our own state to ourselves first
+		if portArr[index] == port && !strings.Contains(faultyRounds, "1") {
+			err5 := cliArr[index].SendMessageToServer(state)
+			if err5 != nil {
+				fmt.Println(err5)
+			}
+			continue
+		}
+		// Create the rest of the clients
+		cli, err := unicast.NewTCPClient(portArr[index], connections)
+		if err != nil {
+			fmt.Println(err)
+		}
+		cliArr[index] = cli
+		
+		err = cli.RunCli()
+		if err != nil {
+			fmt.Println(err)
+		}
+		// check if node is faulty
+		if (!strings.Contains(faultyRounds, "1")) {
+			err2 := cli.SendMessageToServer(state)
+			if err2 != nil {
+				fmt.Println(err2)
+				break
+			}
+		}
+	}
 
-	// s is the source
+	var nodes utils.NodeNums
+	var messageQueue utils.Messages
+	if err != nil {
+		fmt.Println(err)
+	}
+	wg.Add(1)
+	round := 1
+	go func() {
+		receivedNodes := 0
+		isDone := false
+		consensusReached := false
+		// isDone checks for the specific round, consensus checks for consensus
+		for !consensusReached {
+			nodes, err = utils.GetNodeNums(round)
+			// if n-f
+			for len(messageQueue.Messages) < (nodes.TotalNodes - nodes.FaultyNodes) {
+				message := <- messagesChannel
+				if (message.Round == round) {
+					messageQueue.Messages = append(messageQueue.Messages, message)
+				}
+				// fmt.Println("This is the messages queue", messageQueue)
+			}
+			for !isDone {
+				for _, val := range messageQueue.Messages {
+					if (val.Round == round) {
+						// increment when message is for current round
+						receivedNodes++;
+					}
+					if (receivedNodes > nodes.TotalNodes - nodes.FaultyNodes) {
+						// fmt.Println("calculating avg for andy using: ", messageQueue)
+						avg, err := utils.CalculateAverage(messageQueue, round)
+						if err != nil {
+							fmt.Println(err)
+						}
 
-	valueChannel := make(chan unicast.UserInput)
+						round++
+						roundString := strconv.Itoa(round)
 
-	// pass in the source to listen to it
-	go openTCPServerConnections(&s, valueChannel)
+						// Check to make sure node isn't faulty 
+						if !strings.Contains(faultyRounds, roundString) {
+							for _, client := range cliArr {
+								client.SendMessageToServer(avg)
+							}
+						}
 
-	inputStruct, connection := parseJSON(&s)
+						isDone = true
 
-	unicastSend(inputStruct, connection)
+						err = utils.SetJSONRound(round)
+						if err != nil {
+							fmt.Println(err)
+						}
+						
+						break
+					}
+				}
+			}
 
+			isDone = false
+			receivedNodes = 0
+
+			// Check to see if we reached consensus
+			consensusReached, err = utils.CheckForConsensus(messageQueue)
+			if err != nil {
+				fmt.Println(err)
+			}
+
+			// empty message queue
+			messageQueue.Messages = nil
+		}
+		// Set the Consensus in JSON to true so our controller can read the value to run stop script
+		utils.SetJSONConsensus(true)
+	}()
+	wg.Wait()
 
 }
+
+

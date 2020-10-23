@@ -11,7 +11,9 @@ import (
 	"fmt"
 	"math/rand"
 	"time"
+	"strings"
 )
+
 /*
 	Connections: []Connection
 	IP: IP Address to connect to
@@ -58,7 +60,10 @@ type NodeNums struct {
 	TotalNodes int
 	FaultyNodes int
 }
-
+/*
+	minDelay: lower bound for delay
+	maxDelay: upper bound for delay
+*/
 type Delay struct {
 	minDelay int
 	maxDelay int	
@@ -104,11 +109,12 @@ func CreateMessage(state string, round int) Message {
 	@params: N/A
 	@returns: NodeNums, error
 */
-func GetNodeNums() (NodeNums, error) {
+func GetNodeNums(round int) (NodeNums, error) {
 	var connections Connections
 	var nodes NodeNums
 	totalNodes := 0
 	faultyNodes := 0
+	roundString := strconv.Itoa(round)
 	jsonFile, err := os.Open("config.json")
 	if err != nil {
 		return nodes, err
@@ -117,7 +123,7 @@ func GetNodeNums() (NodeNums, error) {
 	json.Unmarshal(byteValue, &connections)
 	jsonFile.Close()
 	for _, val := range connections.Connections {
-		if (val.Status == "") {
+		if (!strings.Contains(val.Status, roundString)) {
 			totalNodes++
 		} else {
 			totalNodes++
@@ -125,6 +131,7 @@ func GetNodeNums() (NodeNums, error) {
 		}
 	}
 	nodes = createNodesObj(totalNodes, faultyNodes)
+	// fmt.Println("Nodes:", nodes)
 	return nodes, nil
 }
 
@@ -263,8 +270,8 @@ func GenerateDelay(delayStruct Delay) {
 }
 
 /*
-	@function: ChangeJSONRound
-	@description: Changes the Round field in JSON to the parameter
+	@function: SetJSONRound
+	@description: Sets the Round field in JSON to the parameter
 	@exported: True
 	@params: int
 	@returns: error
@@ -293,6 +300,13 @@ func SetJSONRound(round int) error {
 }
 
 
+/*
+	@function: GetJSONRound
+	@description: Gets the round from JSON
+	@exported: True
+	@params: N/A
+	@returns: int, error
+*/
 func GetJSONRound() (int, error) {
 	var connections Connections
 	var round int
@@ -307,6 +321,13 @@ func GetJSONRound() (int, error) {
 	return round, nil
 }
 
+/*
+	@function: GetJSONConsensus
+	@description: Gets the consensus from JSON
+	@exported: True
+	@params: N/A
+	@returns: bool, error
+*/
 func GetJSONConsensus() (bool, error) {
 	var connections Connections
 	var consensus bool
@@ -322,6 +343,14 @@ func GetJSONConsensus() (bool, error) {
 	return consensus, nil
 }
 
+
+/*
+	@function: SetJSONConsensus
+	@description: Sets the consensus field in JSON to parameter
+	@exported: True
+	@params: consensus
+	@returns: error
+*/
 func SetJSONConsensus(consensus bool) error {
 	var connections Connections
 	jsonFile, err := os.Open("config.json")

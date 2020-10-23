@@ -44,23 +44,22 @@ func NewTCPServer(port string, connections utils.Connections) (*Server, error) {
 	@description: Starts the TCP server and calls handle connections
 	@exported: True
 	@family: Server
-	@params: chan Message
+	@params: chan Message, chan bool
 	@returns: error
 */
-func (serv *Server) RunServ(messageChannel chan utils.Message) ( err error) {
+func (serv *Server) RunServ(messageChannel chan utils.Message, serverFinished chan bool) ( err error) {
 	serv.server, err = net.Listen("tcp", ":" + serv.port)
     if err != nil {
 		fmt.Println("we did not connect")
         return err
 	}
-	fmt.Println("Listening to the port:", serv.port)
+	serverFinished <- true
+	// fmt.Println("Listening to the port:", serv.port)
 	
 	//defer serv.server.Close()
 
     for {
 		serv.handleConnections(serv.server, messageChannel)
-
-		// break here when calculation is good 
     }
     return
 }
@@ -99,12 +98,12 @@ func (serv *Server) handleConnections(conn net.Listener, messageChannel chan uti
 	@returns: error
 */
 func (serv *Server) handleConnection(conn net.Conn, messagesArr utils.Messages, messageChannel chan utils.Message) (err error) {
-	fmt.Println("ok ok")
+	// fmt.Println("ok ok")
 	var mess utils.Message
     for (err != io.EOF) {
 		dec := gob.NewDecoder(conn)
 		err = dec.Decode(&mess)
-		fmt.Println("Received message:", mess)
+		// fmt.Println("Received message:", mess)
 
 		if err != nil {
 			fmt.Println(err)

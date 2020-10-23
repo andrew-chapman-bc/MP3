@@ -78,7 +78,7 @@ func (cli *Client) SendMessageToServer(messageData utils.Message) (err error) {
 		fmt.Println(err)
 		return err
 	}
-	fmt.Println("Sent data to ", cli.port, messageData)
+	// fmt.Println("Sent data to ", cli.port, messageData)
 	return
 }
 

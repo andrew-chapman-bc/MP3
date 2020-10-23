@@ -67,7 +67,7 @@ The json file has the following format
 "IP":"127.0.0.1",
 "Delay":{"minDelay": 1000, "maxDelay": 5000},
 "Consensus":false,"Round":1}
-
+```
 .... .... .......
 -----------------------------------------------------------------------------------------------
 To read the json file, there are two functions.

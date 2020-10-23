@@ -24,7 +24,7 @@ type Client struct {
 	@description: Creates a Client instance which can be used in the main function
 	@exported: True
 	@family: N/A
-	@params: string
+	@params: string, connections
 	@returns: {*Client}, error
 */
 func NewTCPClient(port string, connections utils.Connections) (*Client, error) {
@@ -41,10 +41,10 @@ func NewTCPClient(port string, connections utils.Connections) (*Client, error) {
 
 /*
 	@function: RunCli
-	@description: Starts the TCP client which calls the function to send message to server
+	@description: Starts the TCP client (Dials)
 	@exported: True
 	@family: Client
-	@params: chan {Message}
+	@params: N/A
 	@returns: error
 */
 func (cli *Client) RunCli() (err error) {
@@ -58,11 +58,11 @@ func (cli *Client) RunCli() (err error) {
 }
 
 /*
-	@function: sendMessageToServer
-	@description: Reads the message channel and serializes the data to send over to server
-	@exported: false
+	@function: SendMessageToServer
+	@description: Reads the message channel and sends the data over to server using GOB
+	@exported: True
 	@family: Client
-	@params: net.Conn, chan {Message}
+	@params: chan {Message}
 	@returns: error
 */
 func (cli *Client) SendMessageToServer(messageData utils.Message) (err error) {
@@ -77,7 +77,14 @@ func (cli *Client) SendMessageToServer(messageData utils.Message) (err error) {
 	return
 }
 
-
+/*
+	@function: FetchInitialState
+	@description: Returns the initial state of the active node
+	@exported: True
+	@family: Client
+	@params: N/A
+	@returns: Message, error
+*/
 func (cli *Client) FetchInitialState() (utils.Message, error) {
 	jsonFile, err := os.Open("config.json")
 	var connections utils.Connections

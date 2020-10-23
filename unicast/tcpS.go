@@ -27,7 +27,7 @@ type Server struct {
 	@description: Creates a Server Instance which can then be used in the main function
 	@exported: True
 	@family: N/A
-	@params: string
+	@params: string, connections
 	@returns: {*Server}, error
 */
 func NewTCPServer(port string, connections utils.Connections) (*Server, error) {
@@ -46,7 +46,7 @@ func NewTCPServer(port string, connections utils.Connections) (*Server, error) {
 	@description: Starts the TCP server and calls handle connections
 	@exported: True
 	@family: Server
-	@params: chan string, chan bool, waitgroup
+	@params: chan Message
 	@returns: error
 */
 func (serv *Server) RunServ(messageChannel chan utils.Message) ( err error) {
@@ -66,18 +66,18 @@ func (serv *Server) RunServ(messageChannel chan utils.Message) ( err error) {
     }
     return
 }
+
 /*
 	@function: handleConnections
-	@description: calls the Accept function in a loop and calls another handleConnection goroutine which decodes data and sends it to the specified client
+	@description: calls the Accept function in a loop and calls another handleConnection goroutine which decodes data via Gob
 	@exported: false
 	@family: Server
-	@params: map[string]net.Conn, chan bool, WaitGroup
+	@params: net.Listener, chan Message
 	@returns: error
 */
 func (serv *Server) handleConnections(conn net.Listener, messageChannel chan utils.Message) (err error) {
 	var messagesArr utils.Messages
 	for {
-		fmt.Println("his ss")
 		conn, err := serv.server.Accept()
         if err != nil || conn == nil {
 			err = errors.New("Network Error: Could not accept connection")
@@ -93,25 +93,12 @@ func (serv *Server) handleConnections(conn net.Listener, messageChannel chan uti
 
 /*
 	@function: handleConnection
-	@description: a goroutine which unserializes JSON data and then calls the sendMessageToClient function
+	@description: a goroutine which decodes data via gob and sends it over a channel
+		which then is used to get the new state
 	@exported: false
 	@family: Server
-	@params: net.Conn, map[string]net.Conn
+	@params: net.Conn, Messages, chan Message
 	@returns: error
-*/
-/*
-[
-	[
-		{ownState 1Round},
-		
-	],
-	[
-		{State Round2},
-		{State, Round2},
-		{State Round2},
-		{State Round2}
-	] 
-]
 */
 func (serv *Server) handleConnection(conn net.Conn, messagesArr utils.Messages, messageChannel chan utils.Message) (err error) {
 	fmt.Println("ok ok")
@@ -120,7 +107,7 @@ func (serv *Server) handleConnection(conn net.Conn, messagesArr utils.Messages, 
     for (err != io.EOF) {
 		err = dec.Decode(&mess)
 		fmt.Println("Received message:", mess)
-		// .1234, 1
+
 		if err != nil {
 			fmt.Println(err)
 			return err

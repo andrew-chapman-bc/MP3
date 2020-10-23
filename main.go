@@ -27,12 +27,14 @@ func getCmdLine() string {
 	return *s
 }
 
+
+
 func main() {
 
 	var wg sync.WaitGroup
-	messageChannel := make(chan utils.Message)
+	messagesChannel := make(chan utils.Message)
 	s := getCmdLine()
-	
+	serverLoaded := false
 	
 	connections, err := utils.GetConnections()
 	if err != nil {
@@ -47,20 +49,44 @@ func main() {
 	
 	wg.Add(1)
 	go func() {
-		defer wg.Done()
-		err1 := serv.RunServ(messageChannel)
+		err1 := serv.RunServ(messagesChannel)
 		if err1 != nil {
 			fmt.Println(err1)
 		}
+		defer wg.Done()
+		serverLoaded = true
 	}()
 	
 	portArr := utils.GetConnectionsPorts(connections)
 	portArrLen := len(portArr)
 
 	cliArr := make([]*unicast.Client, portArrLen)
+	var state utils.Message
+	for index := range portArr {
+		if portArr[index] == port {
+			cli, err := unicast.NewTCPClient(port, connections)
+			if err != nil {
+				fmt.Println(err)
+			}
+			cliArr[index] = cli
+			err = cli.RunCli()
+			if err != nil {
+				fmt.Println(err)
+			}
+			state, err = cli.FetchInitialState()
+			if err != nil {
+				fmt.Println(err)
+			}
+		}
+	}
+
 	for index := range cliArr {
 		// 1234 will always be the first cli here
 		// Need to make it so we send our port's data over first instead of always 1234
+		if portArr[index] == port {
+			continue
+		}
+		time.Sleep(10 * time.Second)
 		cli, err := unicast.NewTCPClient(portArr[index], connections)
 		if err != nil {
 			fmt.Println(err)
@@ -71,31 +97,53 @@ func main() {
 		if err != nil {
 			fmt.Println(err)
 		}
-		newMessage, err := cli.FetchInitialState()
-		err2 := cli.SendMessageToServer(newMessage)
+
+		err2 := cli.SendMessageToServer(state)
 		if err2 != nil {
 			fmt.Println(err2)
 			break
 		}
-		time.Sleep(15 * time.Second)
 	}
 
+	var nodes utils.NodeNums
+	var messageQueue utils.Messages
+	nodes, err = utils.GetNodeNums()
+	if err != nil {
+		fmt.Println(err)
+	}
 	wg.Add(1)
 	go func() {
 		fmt.Println("hi")
-		// if n-f
-		// 		calculateAvg
-		//		sendMessage
-		// for {
-		// 	newMessage := <- messageChannel
-		// 	fmt.Println("this is the message we get from the channel", newMessage)
-		// 	for _, client := range cliArr {
-		// 		err := client.SendMessageToServer(newMessage)
-		// 		if err != nil {
-		// 			fmt.Println(err)
-		// 		}
-		// 	}
-		// }
+		for len(messageQueue.Messages) < (nodes.TotalNodes - nodes.FaultyNodes) {
+			message := <- messagesChannel
+			messageQueue.Messages = append(messageQueue.Messages, message)
+			fmt.Println("This is the messages queue", messageQueue)
+		}
+		round := 1
+		receivedNodes := 0
+		var validMessages utils.Messages
+		isDone := false
+		for !isDone {
+			for index, val := range messageQueue.Messages {
+				if (val.Round == round) {
+					receivedNodes++;
+					validMessages.Messages = append(validMessages.Messages, messageQueue.Messages[index])
+				}
+				if (receivedNodes > nodes.TotalNodes - nodes.FaultyNodes) {
+					fmt.Println("validMessages", validMessages)
+					avg, err := utils.CalculateAverage(validMessages, round)
+					if err != nil {
+						fmt.Println(err)
+					}
+					for _, client := range cliArr {
+						client.SendMessageToServer(avg)
+					}
+					isDone = !isDone
+					round++
+					break
+				}
+			}
+		}
 	}()
 	// 
 	wg.Wait()

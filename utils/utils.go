@@ -96,16 +96,14 @@ func CalculateAverage(messages Messages, index int) (Message, error) {
 	total := 0.00
 	divisor := 0.00
 	var newMess Message
-	var round = index
+	round := index
 	for i := 0; i < len(messages.Messages); i++ {
-		if (messages.Messages[i].Round == index) {
-			stateFloat, err := strconv.ParseFloat(messages.Messages[i].State, 64)
-			if err != nil {
-				return newMess, err
-			}
-			total += stateFloat
-			divisor++
+		stateFloat, err := strconv.ParseFloat(messages.Messages[i].State, 64)
+		if err != nil {
+			return newMess, err
 		}
+		total += stateFloat
+		divisor++
 	}
 	newState := total/divisor
 	newStateString := strconv.FormatFloat(newState, 'f', 4, 64)

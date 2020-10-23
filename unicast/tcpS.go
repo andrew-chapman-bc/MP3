@@ -113,14 +113,9 @@ func (serv *Server) handleConnections(conn net.Listener, messageChannel chan uti
 */
 func (serv *Server) handleConnection(conn net.Conn, messagesArr utils.Messages, messageChannel chan utils.Message) (err error) {
 	fmt.Println("ok ok")
-	nodes, err := utils.GetNodeNums()
-	if err != nil {
-		return err
-	}
+
 	dec := gob.NewDecoder(conn)
 	var mess utils.Message
-	var messages utils.Messages
-	counter := 0
     for (err != io.EOF) {
 		err = dec.Decode(&mess)
 		fmt.Println("this is the message", mess)
@@ -129,9 +124,8 @@ func (serv *Server) handleConnection(conn net.Conn, messagesArr utils.Messages, 
 			fmt.Println("hit this: ", err)
 			return err
 		}
-		messages.Messages = append(messages.Messages, mess)
-		fmt.Println("messages array is", messagesArr)
-		//TODO: stuff
+		fmt.Println("message is", mess)
+		messageChannel <- mess
 	}
 	return
 }

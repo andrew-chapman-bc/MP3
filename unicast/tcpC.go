@@ -67,14 +67,13 @@ func (cli *Client) RunCli() (err error) {
 */
 func (cli *Client) SendMessageToServer(messageData utils.Message) (err error) {
 	
-
 	encoder := gob.NewEncoder(cli.client)
 	encoder.Encode(messageData)
 	if err != nil {
 		fmt.Println(err)
 		return err
 	}
-	fmt.Println("data sent to ", cli.port, messageData)
+	fmt.Println("Sent data to ", cli.port, messageData)
 	return
 }
 

@@ -34,7 +34,6 @@ func main() {
 	var wg sync.WaitGroup
 	messagesChannel := make(chan utils.Message)
 	s := getCmdLine()
-	serverLoaded := false
 	
 	connections, err := utils.GetConnections()
 	if err != nil {
@@ -54,7 +53,6 @@ func main() {
 			fmt.Println(err1)
 		}
 		defer wg.Done()
-		serverLoaded = true
 	}()
 	
 	portArr := utils.GetConnectionsPorts(connections)
@@ -83,10 +81,14 @@ func main() {
 	for index := range cliArr {
 		// 1234 will always be the first cli here
 		// Need to make it so we send our port's data over first instead of always 1234
+		time.Sleep(20 * time.Second)
 		if portArr[index] == port {
+			err5 := cliArr[index].SendMessageToServer(state)
+			if err5 != nil {
+				fmt.Println(err5)
+			}
 			continue
 		}
-		time.Sleep(10 * time.Second)
 		cli, err := unicast.NewTCPClient(portArr[index], connections)
 		if err != nil {
 			fmt.Println(err)
@@ -121,21 +123,20 @@ func main() {
 		}
 		round := 1
 		receivedNodes := 0
-		var validMessages utils.Messages
 		isDone := false
 		for !isDone {
-			for index, val := range messageQueue.Messages {
+			for _, val := range messageQueue.Messages {
 				if (val.Round == round) {
 					receivedNodes++;
-					validMessages.Messages = append(validMessages.Messages, messageQueue.Messages[index])
 				}
 				if (receivedNodes > nodes.TotalNodes - nodes.FaultyNodes) {
-					fmt.Println("validMessages", validMessages)
-					avg, err := utils.CalculateAverage(validMessages, round)
+					fmt.Println("calculating avg for andy using: ", messageQueue)
+					avg, err := utils.CalculateAverage(messageQueue, round)
 					if err != nil {
 						fmt.Println(err)
 					}
 					for _, client := range cliArr {
+						fmt.Println("sending here")
 						client.SendMessageToServer(avg)
 					}
 					isDone = !isDone

@@ -61,6 +61,7 @@ func (serv *Server) RunServ(messageChannel chan utils.Message) ( err error) {
 
     for {
 		serv.handleConnections(serv.server, messageChannel)
+
 		// break here when calculation is good 
     }
     return
@@ -76,6 +77,7 @@ func (serv *Server) RunServ(messageChannel chan utils.Message) ( err error) {
 func (serv *Server) handleConnections(conn net.Listener, messageChannel chan utils.Message) (err error) {
 	var messagesArr utils.Messages
 	for {
+		fmt.Println("his ss")
 		conn, err := serv.server.Accept()
         if err != nil || conn == nil {
 			err = errors.New("Network Error: Could not accept connection")
@@ -113,18 +115,16 @@ func (serv *Server) handleConnections(conn net.Listener, messageChannel chan uti
 */
 func (serv *Server) handleConnection(conn net.Conn, messagesArr utils.Messages, messageChannel chan utils.Message) (err error) {
 	fmt.Println("ok ok")
-
 	dec := gob.NewDecoder(conn)
 	var mess utils.Message
     for (err != io.EOF) {
 		err = dec.Decode(&mess)
-		fmt.Println("this is the message", mess)
+		fmt.Println("Received message:", mess)
 		// .1234, 1
 		if err != nil {
-			fmt.Println("hit this: ", err)
+			fmt.Println(err)
 			return err
 		}
-		fmt.Println("message is", mess)
 		messageChannel <- mess
 	}
 	return

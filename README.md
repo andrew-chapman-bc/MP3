@@ -33,19 +33,16 @@ type Server struct {
 The json file has the following format 
 -----------------------------------------------------------------------------------------------
 ```    
-"connections": [
-        {
-            "Type": "xxx",
-            "Port": "xxx",
-            "Username": "xxx"
-        },
-        {
-            "Type": "xxx",
-            "Port": "xxx",
-            "Username": "xxx"
-        }
-    ],
-    "IP": "127.0.0.1"
+{"connections":
+[{"State":".1234",
+   "Port":"1234",
+    "Status":"5"},
+{"State":".4567","Port":"4567","Status":"2"},
+{"State":".8543","Port":"8543","Status":"3"},
+{"State":".1432","Port":"1432","Status":"4"}],
+"IP":"127.0.0.1",
+"Delay":{"minDelay": 1000, "maxDelay": 5000},
+"Consensus":false,"Round":1}
 ```
 .... .... .......
 -----------------------------------------------------------------------------------------------

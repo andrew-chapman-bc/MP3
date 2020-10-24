@@ -136,8 +136,8 @@ type NodeNums struct {
     Used to simulate latency
 */
 type Delay struct {
-	minDelay int
-	maxDelay int	
+	MinDelay int `json:"MinDelay"`
+	MaxDelay int `json:"MaxDelay"`
 }
 ```  
 

@@ -326,4 +326,6 @@ Our style of TCP would be more similar to a UDP style. Instead of reconnecting m
 we should set up one connnection and keep it the same for the whole process.
 We also could've abstracted our utility.go file more as there is function clutter.
 Additionally, had we had more time we would've found a better way to close connections
-where we wouldn't have to use shell scripts.  
+where we wouldn't have to use shell scripts.  Additionally, right now our actual approxiate
+consensus model is a little wrong.  This is because we don't currently hold all the node's
+states, however just the non-faulty nodes.

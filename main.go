@@ -1,6 +1,7 @@
 package main
 
-import (
+import 
+(
 	"./unicast"
 	"./utils"
 	"fmt"
@@ -163,6 +164,7 @@ func main() {
 				}
 				// fmt.Println("This is the messages queue", messageQueue)
 			}
+			fmt.Println(messageQueue)
 			for !isDone {
 				for _, val := range messageQueue.Messages {
 					if (val.Round == round) {

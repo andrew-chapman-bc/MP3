@@ -1,7 +1,8 @@
 package utils
 
 
-import (
+import
+(
 	"os"
 	"encoding/json"
 	"errors"
@@ -65,8 +66,8 @@ type NodeNums struct {
 	maxDelay: upper bound for delay
 */
 type Delay struct {
-	minDelay int
-	maxDelay int	
+	MinDelay int `json:"minDelay"`
+	MaxDelay int `json:"maxDelay"`
 }
 
 /*
@@ -228,8 +229,8 @@ func CheckForConsensus(messageQueue Messages) (bool, error) {
 */
 func createDelayStruct(minDelay, maxDelay int) Delay {
 	var delay Delay
-	delay.minDelay = minDelay
-	delay.maxDelay = maxDelay
+	delay.MinDelay = minDelay
+	delay.MaxDelay = maxDelay
 	return delay
 }
 
@@ -250,8 +251,8 @@ func GetDelayParams() (Delay, error) {
 	byteValue, _ := ioutil.ReadAll(jsonFile)
 	json.Unmarshal(byteValue, &connections)
 	jsonFile.Close()
-	minDelay := connections.Delays.minDelay
-	maxDelay := connections.Delays.maxDelay
+	minDelay := connections.Delays.MinDelay
+	maxDelay := connections.Delays.MaxDelay
 	delayStruct = createDelayStruct(minDelay, maxDelay)
 	return delayStruct, nil
 }
@@ -265,7 +266,7 @@ func GetDelayParams() (Delay, error) {
 */
 func GenerateDelay(delayStruct Delay) {
 	rand.Seed(time.Now().UnixNano())
-	delayTime := rand.Intn(delayStruct.maxDelay - delayStruct.minDelay + 1) + delayStruct.minDelay
+	delayTime := rand.Intn(delayStruct.MaxDelay - delayStruct.MinDelay + 1) + delayStruct.MinDelay
 	time.Sleep(time.Duration(delayTime) * time.Millisecond)
 }
 

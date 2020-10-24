@@ -4,7 +4,7 @@
 https://docs.google.com/spreadsheets/d/1p_94uyj_fO1ug_x-gX9nW4s4NkYB5qco-zsgbmmXE6o/edit#gid=0
 
 --- 
-
+As we added more nodes, it had the most significant impact on the time it took to achieve consensus.  Furthemore, latency played the next largest factor, however it was random so it also had one of the largest ranges.  The range of values did not seem to make that large of an impact when we were running these tests.  During our trials, it became obvious that the most common amount of rounds it took for all nodes to reach approximate consensus was 3.
 # To Run
 
 ```bash
